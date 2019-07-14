@@ -39,7 +39,7 @@ POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP
 driver.get(POST_PERMALINK)
 
 now = datetime.utcnow().replace(tzinfo=utc)
-while now < AUCTION_END + timedelta(seconds=5):
+while now < AUCTION_END + timedelta(seconds=15):
     now = datetime.utcnow().replace(tzinfo=utc)
     if now > AUCTION_END - timedelta(seconds=5):
         try:

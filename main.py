@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 from datetime import datetime, timedelta
 from pytz import timezone, utc
+from time import sleep
 
 from auction import Auction
 from biddingattempt import BiddingAttempt
@@ -60,9 +61,9 @@ while now < AUCTION_END + timedelta(seconds=5):
                 charlie_sheen = '#Winning'
             elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
                 make_bid(driver, lowest_valid_bid)
+                sleep(0.5)
                 bidding_attempt.my_active_bid = lowest_valid_bid
             else:
-                # make_bid(driver, "I'm out, guys!")  # debug message for end
                 break
         except StaleElementReferenceException as err:
             # This will occur when a comment posts during iteration through the comments

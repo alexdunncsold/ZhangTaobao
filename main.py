@@ -40,7 +40,7 @@ driver.get(POST_PERMALINK)
 now = datetime.utcnow().replace(tzinfo=utc)
 while now < AUCTION_END + timedelta(seconds=5):
     now = datetime.utcnow().replace(tzinfo=utc)
-    if now > AUCTION_END - timedelta(seconds=15):
+    if now > AUCTION_END - timedelta(seconds=5):
         try:
             remove_all_child_comments(driver)
 

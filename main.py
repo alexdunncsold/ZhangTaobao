@@ -2,7 +2,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 from datetime import datetime, timedelta
-from pytz import timezone
+from pytz import timezone, utc
 
 from auction import Auction
 from biddingattempt import BiddingAttempt
@@ -37,33 +37,36 @@ login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
 driver.get(POST_PERMALINK)
 
-while True:
-    try:
-        remove_all_child_comments(driver)
+now = datetime.utcnow().replace(tzinfo=utc)
+while now < AUCTION_END + timedelta(seconds=15):
+    now = datetime.utcnow().replace(tzinfo=utc)
+    if now > AUCTION_END - timedelta(seconds=15):
+        try:
+            remove_all_child_comments(driver)
 
-        valid_bid_history = [0, ]
-        comment_elem_list = driver.find_elements_by_class_name('_3l3x')
-        for comment in comment_elem_list:
-            try:
-                comment_bid_amount = parse_bid(comment.text)
-                if comment_bid_amount >= valid_bid_history[-1] + auction.min_bid_step:
-                    valid_bid_history.append(comment_bid_amount)
-            except ValueError as err:
-                pass
+            valid_bid_history = [0, ]
+            comment_elem_list = driver.find_elements_by_class_name('_3l3x')
+            for comment in comment_elem_list:
+                try:
+                    comment_bid_amount = parse_bid(comment.text)
+                    if comment_bid_amount >= valid_bid_history[-1] + auction.min_bid_step:
+                        valid_bid_history.append(comment_bid_amount)
+                except ValueError as err:
+                    pass
 
-        lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1]+auction.min_bid_step)
+            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1]+auction.min_bid_step)
 
-        if bidding_attempt.my_active_bid == valid_bid_history[-1]:
-            charlie_sheen = '#Winning'
-        elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
-            make_bid(driver, lowest_valid_bid)
-            bidding_attempt.my_active_bid = lowest_valid_bid
-        else:
-            # make_bid(driver, "I'm out, guys!")  # debug message for end
-            break
-    except StaleElementReferenceException as err:
-        # This will occur when a comment posts during iteration through the comments
-        # It can be safely ignored, as the bid will process during the next iteration
-        print("DOM updated while attempting to bid - bid skipped, iteration continues")
+            if bidding_attempt.my_active_bid == valid_bid_history[-1]:
+                charlie_sheen = '#Winning'
+            elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
+                make_bid(driver, lowest_valid_bid)
+                bidding_attempt.my_active_bid = lowest_valid_bid
+            else:
+                # make_bid(driver, "I'm out, guys!")  # debug message for end
+                break
+        except StaleElementReferenceException as err:
+            # This will occur when a comment posts during iteration through the comments
+            # It can be safely ignored, as the bid will process during the next iteration
+            print("DOM updated while attempting to bid - bid skipped, iteration continues")
 
 driver.quit()

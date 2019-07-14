@@ -1,5 +1,4 @@
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import StaleElementReferenceException
 from datetime import datetime, timezone, timedelta
@@ -12,6 +11,7 @@ from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
 from secrets import *
 
+GROUP_ID = GROUP_IDS['dev']
 POST_ID = 1309908152519516
 POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_ID, POST_ID)
 

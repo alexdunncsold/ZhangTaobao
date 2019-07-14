@@ -1,3 +1,5 @@
+from selenium.webdriver.common.keys import Keys
+
 def remove_all_child_comments(webdriver):
     child_comment_removal_script = '''
                 elements = document.getElementsByClassName("_2h2j");

@@ -1,5 +1,20 @@
 from selenium.webdriver.common.keys import Keys
 
+def login_to_facebook(driver, email, password):
+    driver.get("https://www.facebook.com/")
+    assert 'Facebook - Log In or Sign Up' in driver.title
+
+    email_elem = driver.find_element_by_id('email')
+    email_elem.clear()
+    email_elem.send_keys(email)
+
+    password_elem = driver.find_element_by_id('pass')
+    password_elem.clear()
+    password_elem.send_keys(password)
+
+    password_elem.send_keys(Keys.RETURN)
+
+
 def remove_all_child_comments(webdriver):
     child_comment_removal_script = '''
                 elements = document.getElementsByClassName("_2h2j");

@@ -11,12 +11,11 @@ from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
 from secrets import *
 
-GROUP_ID = GROUP_IDS['dev']
+run_config = 'dev'
 POST_ID = 1309908152519516
-POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_ID, POST_ID)
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
-auction_group = FacebookGroup("Battlefield Pu'er", GROUP_ID)
+auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, datetime, 100, 500)
 bidding_attempt = BiddingAttempt(credentials, auction_group, auction, 8888)
 
@@ -25,21 +24,12 @@ options.add_argument('--disable-notifications')
 driver = webdriver.Chrome(options=options)
 
 # Perform Login
-driver.get("https://www.facebook.com/")
-assert 'Facebook - Log In or Sign Up' in driver.title
-
-email_elem = driver.find_element_by_id('email')
-email_elem.clear()
-email_elem.send_keys(MY_FB_EMAIL_ADDRESS)
-
-password_elem = driver.find_element_by_id('pass')
-password_elem.clear()
-password_elem.send_keys(MY_FB_PASSWORD)
-
-password_elem.send_keys(Keys.RETURN)
+login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 
 # Monitor auction status
+POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
 driver.get(POST_PERMALINK)
+
 while True:
     try:
         remove_all_child_comments(driver)

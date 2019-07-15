@@ -4,6 +4,7 @@ from selenium.common.exceptions import StaleElementReferenceException
 from datetime import datetime, timedelta
 from pytz import timezone, utc
 from time import sleep
+from sys import platform
 
 from auction import Auction
 from biddingattempt import BiddingAttempt
@@ -29,7 +30,16 @@ auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP)
 bidding_attempt = BiddingAttempt(credentials, auction_group, auction, YOUR_MAX_BID)
 
 options = Options()
-options.add_argument('--disable-notifications')
+if platform == 'win32':
+    options.add_argument('--disable-notifications')
+elif platform == 'linux':
+    options = Options()
+    options.add_argument('--disable-notifications')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--headless')
+    options.add_argument('--remote-debugging-port=9222')
+else:
+    raise RuntimeError('Error while setting webdriver options: platform {} not supported.'.format(platform))
 driver = webdriver.Chrome(options=options)
 
 # Perform Login

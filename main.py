@@ -40,14 +40,18 @@ elif platform == 'linux':
     options.add_argument('--remote-debugging-port=9222')
 else:
     raise RuntimeError('Error while setting webdriver options: platform {} not supported.'.format(platform))
+print('Platform identified as {}.  Instantiating driver...'.format(platform))
 driver = webdriver.Chrome(options=options)
+print('Driver instantiated. Initiating login...')
 
 # Perform Login
 login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
+print("Logged in. Navigating to auction page...")
 
 # Monitor auction status
 POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
 driver.get(POST_PERMALINK)
+print('Loaded {}'.format(POST_PERMALINK))
 
 now = datetime.utcnow().replace(tzinfo=utc)
 while now < AUCTION_END + timedelta(seconds=15):
@@ -71,14 +75,19 @@ while now < AUCTION_END + timedelta(seconds=15):
             if bidding_attempt.my_active_bid == valid_bid_history[-1]:
                 charlie_sheen = '#Winning'
             elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
+                print('Bid condition triggered.')
                 make_bid(driver, lowest_valid_bid)
                 sleep(0.5)
                 bidding_attempt.my_active_bid = lowest_valid_bid
             else:
+                print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
+                    lowest_valid_bid, bidding_attempt.max_bid_amount))
                 break
         except StaleElementReferenceException as err:
             # This will occur when a comment posts during iteration through the comments
             # It can be safely ignored, as the bid will process during the next iteration
             print("DOM updated while attempting to bid - bid skipped, iteration continues")
 
+print('Quitting webdriver...')
 driver.quit()
+print('Complete.')

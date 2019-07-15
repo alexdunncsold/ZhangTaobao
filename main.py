@@ -44,50 +44,53 @@ print('Platform identified as {}.  Instantiating driver...'.format(platform))
 driver = webdriver.Chrome(options=options)
 print('Driver instantiated. Initiating login...')
 
-# Perform Login
-login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
-print("Logged in. Navigating to auction page...")
+try:
+    # Perform Login
+    login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
+    print("Logged in. Navigating to auction page...")
 
-# Monitor auction status
-POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
-driver.get(POST_PERMALINK)
-print('Loaded {}'.format(POST_PERMALINK))
+    # Monitor auction status
+    POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
+    driver.get(POST_PERMALINK)
+    print('Loaded {}'.format(POST_PERMALINK))
 
-now = datetime.utcnow().replace(tzinfo=utc)
-while now < AUCTION_END + timedelta(seconds=15):
     now = datetime.utcnow().replace(tzinfo=utc)
-    if now > AUCTION_END - timedelta(seconds=5):
-        try:
-            remove_all_child_comments(driver)
+    while now < AUCTION_END + timedelta(seconds=15):
+        now = datetime.utcnow().replace(tzinfo=utc)
+        if now > AUCTION_END - timedelta(seconds=5):
+            try:
+                remove_all_child_comments(driver)
 
-            valid_bid_history = [0, ]
-            comment_elem_list = driver.find_elements_by_class_name('_3l3x')
-            for comment in comment_elem_list:
-                try:
-                    comment_bid_amount = parse_bid(comment.text)
-                    if comment_bid_amount >= valid_bid_history[-1] + auction.min_bid_step:
-                        valid_bid_history.append(comment_bid_amount)
-                except ValueError as err:
-                    pass
+                valid_bid_history = [0, ]
+                comment_elem_list = driver.find_elements_by_class_name('_3l3x')
+                for comment in comment_elem_list:
+                    try:
+                        comment_bid_amount = parse_bid(comment.text)
+                        if comment_bid_amount >= valid_bid_history[-1] + auction.min_bid_step:
+                            valid_bid_history.append(comment_bid_amount)
+                    except ValueError as err:
+                        pass
 
-            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1]+auction.min_bid_step)
+                lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
 
-            if bidding_attempt.my_active_bid == valid_bid_history[-1]:
-                charlie_sheen = '#Winning'
-            elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
-                print('Bid condition triggered.')
-                make_bid(driver, lowest_valid_bid)
-                sleep(0.5)
-                bidding_attempt.my_active_bid = lowest_valid_bid
-            else:
-                print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
-                    lowest_valid_bid, bidding_attempt.max_bid_amount))
-                break
-        except StaleElementReferenceException as err:
-            # This will occur when a comment posts during iteration through the comments
-            # It can be safely ignored, as the bid will process during the next iteration
-            print("DOM updated while attempting to bid - bid skipped, iteration continues")
-
-print('Quitting webdriver...')
-driver.quit()
-print('Complete.')
+                if bidding_attempt.my_active_bid == valid_bid_history[-1]:
+                    charlie_sheen = '#Winning'
+                elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
+                    print('Bid condition triggered.')
+                    make_bid(driver, lowest_valid_bid)
+                    sleep(0.5)
+                    bidding_attempt.my_active_bid = lowest_valid_bid
+                else:
+                    print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
+                        lowest_valid_bid, bidding_attempt.max_bid_amount))
+                    break
+            except StaleElementReferenceException as err:
+                # This will occur when a comment posts during iteration through the comments
+                # It can be safely ignored, as the bid will process during the next iteration
+                print("DOM updated while attempting to bid - bid skipped, iteration continues")
+except Exception as err:
+    print(repr(err))
+finally:
+    print('Quitting webdriver...')
+    driver.quit()
+    print('Complete.')

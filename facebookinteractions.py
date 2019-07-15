@@ -1,4 +1,5 @@
 from selenium.webdriver.common.keys import Keys
+from commenttextparser import parse_bid
 
 
 def login_to_facebook(webdriver, credentials):
@@ -39,6 +40,21 @@ def remove_all_child_comments(webdriver):
                 for (let e of elements) {e.innerHTML='';};
             '''
     webdriver.execute_script(child_comment_removal_script)
+
+
+def parse_bid_history(webdriver, context):
+    remove_all_child_comments(webdriver)
+
+    valid_bid_history = [0, ]
+    comment_elem_list = webdriver.find_elements_by_class_name('_3l3x')
+    for comment in comment_elem_list:
+        try:
+            comment_bid_amount = parse_bid(comment.text)
+            if comment_bid_amount >= valid_bid_history[-1] + context.auction.min_bid_step:
+                valid_bid_history.append(comment_bid_amount)
+        except ValueError as err:
+            pass
+    return valid_bid_history
 
 
 def make_bid(webdriver, bid_amount):

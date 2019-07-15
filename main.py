@@ -8,7 +8,6 @@ from sys import platform
 
 from auction import Auction
 from auctioncontext import AuctionContext
-from commenttextparser import *
 from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
@@ -56,17 +55,7 @@ try:
         now = datetime.utcnow().replace(tzinfo=utc)
         if now > AUCTION_END - timedelta(seconds=5):
             try:
-                remove_all_child_comments(driver)
-
-                valid_bid_history = [0, ]
-                comment_elem_list = driver.find_elements_by_class_name('_3l3x')
-                for comment in comment_elem_list:
-                    try:
-                        comment_bid_amount = parse_bid(comment.text)
-                        if comment_bid_amount >= valid_bid_history[-1] + auction.min_bid_step:
-                            valid_bid_history.append(comment_bid_amount)
-                    except ValueError as err:
-                        pass
+                valid_bid_history = parse_bid_history(driver, auction_context)
 
                 lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
 
@@ -81,10 +70,12 @@ try:
                     print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
                         lowest_valid_bid, auction_context.max_bid_amount))
                     break
+
             except StaleElementReferenceException as err:
                 # This will occur when a comment posts during iteration through the comments
                 # It can be safely ignored, as the bid will process during the next iteration
                 print("DOM updated while attempting to bid - bid skipped, iteration continues")
+
 except Exception as err:
     print(repr(err))
 finally:

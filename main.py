@@ -7,7 +7,7 @@ from time import sleep
 from sys import platform
 
 from auction import Auction
-from biddingattempt import BiddingAttempt
+from auctioncontext import AuctionContext
 from commenttextparser import *
 from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
@@ -27,7 +27,7 @@ YOUR_MAX_BID = 8888
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP)
-bidding_attempt = BiddingAttempt(credentials, auction_group, auction, YOUR_MAX_BID)
+auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID)
 
 options = Options()
 if platform == 'win32':
@@ -46,13 +46,10 @@ print('Driver instantiated. Initiating login...')
 
 try:
     # Perform Login
-    login_to_facebook(driver, MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
-    print("Logged in. Navigating to auction page...")
+    login_to_facebook(driver, credentials)
 
-    # Monitor auction status
-    POST_PERMALINK = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(GROUP_IDS[run_config], POST_ID)
-    driver.get(POST_PERMALINK)
-    print('Loaded {}'.format(POST_PERMALINK))
+    # Load auction page
+    load_auction_page(driver, auction_context)
 
     now = datetime.utcnow().replace(tzinfo=utc)
     while now < AUCTION_END + timedelta(seconds=15):
@@ -73,16 +70,16 @@ try:
 
                 lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
 
-                if bidding_attempt.my_active_bid == valid_bid_history[-1]:
+                if auction_context.my_active_bid == valid_bid_history[-1]:
                     charlie_sheen = '#Winning'
-                elif lowest_valid_bid <= bidding_attempt.max_bid_amount:
+                elif lowest_valid_bid <= auction_context.max_bid_amount:
                     print('Bid condition triggered.')
                     make_bid(driver, lowest_valid_bid)
                     sleep(0.5)
-                    bidding_attempt.my_active_bid = lowest_valid_bid
+                    auction_context.my_active_bid = lowest_valid_bid
                 else:
                     print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
-                        lowest_valid_bid, bidding_attempt.max_bid_amount))
+                        lowest_valid_bid, auction_context.max_bid_amount))
                     break
             except StaleElementReferenceException as err:
                 # This will occur when a comment posts during iteration through the comments

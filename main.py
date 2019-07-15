@@ -17,6 +17,7 @@ from secrets import *
 run_config = 'dev'
 POST_ID = 1309908152519516
 AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 14, 22, 59, 59))
+AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(seconds=20) if run_config == 'dev' else AUCTION_END
 STARTING_BID = 500
 BID_STEP = 100
 YOUR_MAX_BID = 8888

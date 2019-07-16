@@ -3,7 +3,7 @@ class FacebookGroup:
     id = ''
 
     def __init__(self, name, id):
-        if len(id) != 15:
+        if len(id) != 16:
             raise ValueError('FacebookGroup __init__(): supplied id {} invalid'.format(id))
 
         self.name = name

@@ -15,8 +15,9 @@ loc_tz = timezone('America/Los_Angeles')
 run_config = 'dev'  # dev, precipice_test, battlefield, storm
 extension_count = 0
 PLACE_INITIAL_BID = True
-POST_ID = '1309664552543876'
-AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 17, 22, 00, 00))
+minimum_bids_to_save_face = 10 if run_config == 'dev' else 3
+POST_ID = '1312495965594068'
+AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 18, 21, 30, 00))
 AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(
     minutes=3) if run_config == 'dev' else AUCTION_END
 STARTING_BID = 1

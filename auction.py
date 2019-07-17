@@ -9,7 +9,7 @@ class Auction:
     min_bid_amount = None
 
     def __init__(self, id, end_datetime, min_bid_amount, min_bid_step):
-        if len(id) != 16:
+        if not 15 <= len(id) <= 16:
             raise ValueError('Auction __init__(): supplied id {} invalid'.format(id))
         if end_datetime <= datetime.utcnow().replace(tzinfo=utc):
             raise ValueError('Auction __init__(): supplied end_datetime is in the past')

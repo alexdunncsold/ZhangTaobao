@@ -1,7 +1,7 @@
 class FacebookCredentials:
-    email_address = ''
+    email = ''
     password = ''
 
-    def __init__(self, email_address, password):
-        self.email_address = email_address
+    def __init__(self, email, password):
+        self.email = email
         self.password = password

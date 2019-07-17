@@ -62,6 +62,8 @@ def parse_bid_history(webdriver, context):
 
 def make_bid(webdriver, auction_context, bid_amount):
     print('Preparing to bid {}'.format(bid_amount))
+    if bid_amount > auction_context.max_bid_amount:
+        raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
     all_comments_elem = webdriver.find_element_by_css_selector('[data-testid="UFI2CommentsList/root_depth_0"]')
     comment_form = all_comments_elem.find_elements_by_tag_name("form")[-1]
     comment_form.click()

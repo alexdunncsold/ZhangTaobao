@@ -39,7 +39,7 @@ try:
     load_auction_page(driver, auction_context)
 
     now = datetime.utcnow().replace(tzinfo=utc)
-    while now < AUCTION_END + timedelta(seconds=15):
+    while now < AUCTION_END + timedelta(minutes=10, seconds=15) if EXTENSIONS else timedelta(seconds=15):
         now = datetime.utcnow().replace(tzinfo=utc)
         if now > AUCTION_END - timedelta(seconds=5):
             try:

@@ -12,23 +12,22 @@ from secrets import *
 loc_tz = timezone('America/Los_Angeles')
 
 #########################################################################################
-run_config = 'storm'  # dev, precipice_test, battlefield, storm
-MODE = 'aggressive'  # friendly, respectful, aggressive, ruthless
-extension_count = 2
-PLACE_INITIAL_BID = False
-POST_ID = '1319562304877092'
+run_config = 'dev'  # dev, precipice_test, battlefield, storm
+extension_count = 0
+PLACE_INITIAL_BID = True
+POST_ID = '1309664552543876'
 AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 17, 22, 00, 00))
 AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(
     minutes=1) if run_config == 'dev' else AUCTION_END
 STARTING_BID = 100
 BID_STEP = 50
-YOUR_MAX_BID = 3300
+YOUR_MAX_BID = 3600
 #########################################################################################
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP)
-auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, MODE, run_config)
+auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, run_config)
 driver = get_webdriver()
 
 try:

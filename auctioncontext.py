@@ -7,24 +7,21 @@ class AuctionContext:
     auction = None
     max_bid_amount = None
     my_active_bid = None
-    mode = None
     run_config = None
 
-    def __init__(self, credentials, facebook_group, auction, max_bid_amount, mode, run_config):
+    def __init__(self, credentials, facebook_group, auction, max_bid_amount, run_config):
         self.credentials = credentials
         self.facebook_group = facebook_group
         self.auction = auction
         self.max_bid_amount = max_bid_amount
         self.my_active_bid = 0
         self.bids_placed = 0
-        self.mode = mode
         self.run_config = run_config
 
         assert self.credentials is not None
         assert self.facebook_group is not None
         assert self.auction is not None
         assert self.max_bid_amount is not None
-        assert self.mode is not None
 
         assert max_bid_amount > self.auction.min_bid_amount
 

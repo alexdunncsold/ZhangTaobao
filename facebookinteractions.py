@@ -1,6 +1,7 @@
 from selenium.webdriver.common.keys import Keys
 from commenttextparser import parse_bid
 from datetime import datetime, timedelta
+from time import sleep
 
 
 def login_to_facebook(webdriver, credentials):
@@ -59,18 +60,22 @@ def parse_bid_history(webdriver, context):
     return valid_bid_history
 
 
-def make_bid(webdriver, bid_amount):
+def make_bid(webdriver, auction_context, bid_amount):
     print('Preparing to bid {}'.format(bid_amount))
     all_comments_elem = webdriver.find_element_by_css_selector('[data-testid="UFI2CommentsList/root_depth_0"]')
     comment_form = all_comments_elem.find_elements_by_tag_name("form")[-1]
     comment_form.click()
     reply_elem = comment_form.find_element_by_class_name("_5rpu")
-    reply_elem.send_keys(str(bid_amount))
+    reply_elem.send_keys(str(bid_amount) + '(autobid)' if auction_context.run_config == 'dev' else str(bid_amount))
     print('Submitting bid of {}'.format(bid_amount))
     reply_elem.send_keys(Keys.RETURN)
+    sleep(0.5)
+
+    auction_context.my_active_bid = bid_amount
+    auction_context.bids_placed += 1
 
 
-def make_bid_without_submit(webdriver, bid_amount):
+def make_bid_without_submit(webdriver, auction_context, bid_amount):
     print('Preparing to bid {}'.format(bid_amount))
     all_comments_elem = webdriver.find_element_by_css_selector('[data-testid="UFI2CommentsList/root_depth_0"]')
     comment_form = all_comments_elem.find_elements_by_tag_name("form")[-1]
@@ -78,6 +83,10 @@ def make_bid_without_submit(webdriver, bid_amount):
     reply_elem = comment_form.find_element_by_class_name("_5rpu")
     reply_elem.send_keys(str(bid_amount))
     print('Ready to submit bid of {} - halting for 5 seconds'.format(bid_amount))
+    sleep(0.5)
+
+    auction_context.my_active_bid = bid_amount
+    auction_context.bids_placed += 1
 
     then = datetime.now()
     while (datetime.now() < then + timedelta(seconds=5)):

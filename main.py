@@ -1,8 +1,5 @@
 from selenium.common.exceptions import StaleElementReferenceException
-from datetime import datetime, timedelta
 from pytz import timezone, utc
-from time import sleep
-from sys import platform
 
 from auction import Auction
 from auctioncontext import AuctionContext
@@ -12,23 +9,26 @@ from facebookgroup import FacebookGroup
 from webdriverhelper import get_webdriver
 from secrets import *
 
+loc_tz = timezone('America/Los_Angeles')
+
 #########################################################################################
-run_config = 'dev'  # dev, precipice_test, production
+run_config = 'storm'  # dev, precipice_test, battlefield, storm
 MODE = 'aggressive'  # friendly, respectful, aggressive, ruthless
-EXTENSIONS = False
-POST_ID = '1309908152519516'
-AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 14, 22, 59, 59))
+extension_count = 2
+PLACE_INITIAL_BID = False
+POST_ID = '1319562304877092'
+AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 17, 22, 00, 00))
 AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(
-    seconds=20) if run_config != 'production' else AUCTION_END
-STARTING_BID = 500
-BID_STEP = 100
-YOUR_MAX_BID = 8888
+    minutes=1) if run_config == 'dev' else AUCTION_END
+STARTING_BID = 100
+BID_STEP = 50
+YOUR_MAX_BID = 3300
 #########################################################################################
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP)
-auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, MODE)
+auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, MODE, run_config)
 driver = get_webdriver()
 
 try:
@@ -39,37 +39,82 @@ try:
     load_auction_page(driver, auction_context)
 
     now = datetime.utcnow().replace(tzinfo=utc)
-    while now < AUCTION_END + timedelta(minutes=10, seconds=15) if EXTENSIONS else timedelta(seconds=15):
+    competing_bid_logged = None
+    next_bid_scheduled = None
+    minimum_bids_to_save_face = 2  # todo link to mode later
+    print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
+
+    while now < auction_context.auction.end_datetime + timedelta(seconds=5):
         now = datetime.utcnow().replace(tzinfo=utc)
-        if now > AUCTION_END - timedelta(seconds=5):
-            try:
-                valid_bid_history = parse_bid_history(driver, auction_context)
+        try:
+            valid_bid_history = parse_bid_history(driver, auction_context)
 
-                lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
+            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
 
-                if auction_context.my_active_bid == valid_bid_history[-1]:
-                    charlie_sheen = '#Winning'
-                elif auction_context.my_active_bid > valid_bid_history[-1]:
-                    raise RuntimeError('main(): Active bid not reflected in bid history, auction state corrupted.')
-                elif lowest_valid_bid <= auction_context.max_bid_amount:
-                    print('Bid condition triggered.')
+            # if currently winning
+            if auction_context.my_active_bid == valid_bid_history[-1]:
+                charlie_sheen = '#Winning'
 
-                    make_bid_without_submit(driver, lowest_valid_bid) if run_config == 'precipice_test' else make_bid(
-                        driver, lowest_valid_bid)
-                    sleep(0.5)
-                    auction_context.my_active_bid = lowest_valid_bid
-                else:
-                    print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
-                        lowest_valid_bid, auction_context.max_bid_amount))
-                    break
+            # if auction_context corrupted
+            elif auction_context.my_active_bid > valid_bid_history[-1]:
+                raise RuntimeError('main(): Active bid not reflected in bid history, auction state corrupted.')
 
-            except StaleElementReferenceException as err:
-                # This will occur when a comment posts during iteration through the comments
-                # It can be safely ignored, as the bid will process during the next iteration
-                print("DOM updated while attempting to bid - bid skipped, iteration continues")
+            # if initial bid needs to be placed
+            elif PLACE_INITIAL_BID and auction_context.bids_placed == 0 \
+                    and lowest_valid_bid <= auction_context.max_bid_amount:
 
-except Exception as err:
-    print(repr(err))
+                print('Placing initial bid.')
+                make_bid_without_submit(driver, auction_context,
+                                        lowest_valid_bid) if run_config == 'precipice_test' else make_bid(
+                    driver, auction_context, lowest_valid_bid)
+
+            # if currently outbid, and more courtesy bids required
+            elif auction_context.bids_placed < minimum_bids_to_save_face \
+                    and lowest_valid_bid <= auction_context.max_bid_amount and competing_bid_logged is None:
+
+                competing_bid_logged = datetime.utcnow().replace(tzinfo=utc)
+                print("Competing bid {} logged at {}".format(valid_bid_history[-1],
+                                                             competing_bid_logged.astimezone(loc_tz)))
+
+                next_bid_scheduled = (competing_bid_logged + (
+                            auction_context.auction.end_datetime - competing_bid_logged) / 2).astimezone(loc_tz)
+                print('Next outbid scheduled for {}'.format(next_bid_scheduled))
+
+            # if it's time to make a scheduled courtesy bid
+            elif next_bid_scheduled and now > next_bid_scheduled \
+                    and lowest_valid_bid <= auction_context.max_bid_amount:
+
+                print('Courtesy bid triggered.')
+                make_bid(driver, auction_context, lowest_valid_bid)
+
+                competing_bid_logged = None
+                next_bid_scheduled = None
+
+            # if it's time to snipe
+            elif auction_context.critical_period_active() and lowest_valid_bid <= auction_context.max_bid_amount:
+
+                print('Bid condition detected during critical period.')
+
+                # extend auction immediately to avoid inaccuracy
+                if extension_count:
+                    extension_count -= 1
+                    print('Extending auction by 5min ({} extensions remaining)'.format(extension_count))
+                    auction_context.auction.end_datetime += timedelta(minutes=1 if run_config == 'dev' else 5)
+                    print('Auction end extended to {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
+
+                make_bid(driver, auction_context, lowest_valid_bid)
+
+            elif lowest_valid_bid > auction_context.max_bid_amount:
+                print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
+                    lowest_valid_bid, auction_context.max_bid_amount))
+                break
+
+        except StaleElementReferenceException as err:
+            # This will occur when a comment posts during iteration through the comments
+            # It can be safely ignored, as the bid will process during the next iteration
+            # print("DOM updated while attempting to bid - bid skipped, iteration continues")
+            pass
+
 finally:
     print('Quitting webdriver...')
     driver.quit()

@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
 from pytz import utc
 
+
 class AuctionContext:
     credentials = None
     facebook_group = None
     auction = None
     max_bid_amount = None
+    my_facebook_id = None
     my_active_bid = None
     run_config = None
 
@@ -14,6 +16,7 @@ class AuctionContext:
         self.facebook_group = facebook_group
         self.auction = auction
         self.max_bid_amount = max_bid_amount
+        self.my_facebook_id = ''
         self.my_active_bid = 0
         self.bids_placed = 0
         self.run_config = run_config

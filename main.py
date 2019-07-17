@@ -18,10 +18,10 @@ PLACE_INITIAL_BID = True
 POST_ID = '1309664552543876'
 AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 17, 22, 00, 00))
 AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(
-    minutes=1) if run_config == 'dev' else AUCTION_END
-STARTING_BID = 100
+    minutes=3) if run_config == 'dev' else AUCTION_END
+STARTING_BID = 1
 BID_STEP = 50
-YOUR_MAX_BID = 3600
+YOUR_MAX_BID = 17000
 #########################################################################################
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
@@ -32,7 +32,7 @@ driver = get_webdriver()
 
 try:
     # Perform Login
-    login_to_facebook(driver, credentials)
+    login_to_facebook(driver, auction_context)
 
     # Load auction page
     load_auction_page(driver, auction_context)
@@ -40,7 +40,6 @@ try:
     now = datetime.utcnow().replace(tzinfo=utc)
     competing_bid_logged = None
     next_bid_scheduled = None
-    minimum_bids_to_save_face = 2  # todo link to mode later
     print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
 
     while now < auction_context.auction.end_datetime + timedelta(seconds=5):
@@ -48,18 +47,20 @@ try:
         try:
             valid_bid_history = parse_bid_history(driver, auction_context)
 
-            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1] + auction.min_bid_step)
+            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1].value + auction.min_bid_step)
 
             # if currently winning
-            if auction_context.my_active_bid == valid_bid_history[-1]:
+            if valid_bid_history[-1].bidder == auction_context.my_facebook_id \
+                    and (run_config != 'dev' or valid_bid_history[-1] == auction_context.my_active_bid):
                 charlie_sheen = '#Winning'
 
             # if auction_context corrupted
-            elif auction_context.my_active_bid > valid_bid_history[-1]:
+            elif auction_context.my_active_bid > valid_bid_history[-1].value:
                 raise RuntimeError('main(): Active bid not reflected in bid history, auction state corrupted.')
 
             # if initial bid needs to be placed
-            elif PLACE_INITIAL_BID and auction_context.bids_placed == 0 \
+            elif PLACE_INITIAL_BID \
+                    and auction_context.bids_placed == 0 \
                     and lowest_valid_bid <= auction_context.max_bid_amount:
 
                 print('Placing initial bid.')
@@ -68,11 +69,13 @@ try:
                     driver, auction_context, lowest_valid_bid)
 
             # if currently outbid, and more courtesy bids required
-            elif auction_context.bids_placed < minimum_bids_to_save_face \
-                    and lowest_valid_bid <= auction_context.max_bid_amount and competing_bid_logged is None:
+            elif valid_bid_history[-1].bidder != auction_context.my_facebook_id \
+                    and auction_context.bids_placed < minimum_bids_to_save_face \
+                    and lowest_valid_bid <= auction_context.max_bid_amount \
+                    and competing_bid_logged is None:
 
                 competing_bid_logged = datetime.utcnow().replace(tzinfo=utc)
-                print("Competing bid {} logged at {}".format(valid_bid_history[-1],
+                print("Competing bid {} logged at {}".format(valid_bid_history[-1].value,
                                                              competing_bid_logged.astimezone(loc_tz)))
 
                 next_bid_scheduled = (competing_bid_logged + (
@@ -80,7 +83,8 @@ try:
                 print('Next outbid scheduled for {}'.format(next_bid_scheduled))
 
             # if it's time to make a scheduled courtesy bid
-            elif next_bid_scheduled and now > next_bid_scheduled \
+            elif next_bid_scheduled \
+                    and now > next_bid_scheduled \
                     and lowest_valid_bid <= auction_context.max_bid_amount:
 
                 print('Courtesy bid triggered.')
@@ -90,7 +94,9 @@ try:
                 next_bid_scheduled = None
 
             # if it's time to snipe
-            elif auction_context.critical_period_active() and lowest_valid_bid <= auction_context.max_bid_amount:
+            elif auction_context.critical_period_active() \
+                    and valid_bid_history[-1].bidder != auction_context.my_facebook_id \
+                    and lowest_valid_bid <= auction_context.max_bid_amount:
 
                 print('Bid condition detected during critical period.')
 
@@ -104,7 +110,7 @@ try:
                 make_bid(driver, auction_context, lowest_valid_bid)
 
             elif lowest_valid_bid > auction_context.max_bid_amount:
-                print('Currently outbid and minimum valid bid {} exceeds upper limit {} - quitting...'.format(
+                print('Minimum valid bid {} exceeds upper limit {} - quitting...'.format(
                     lowest_valid_bid, auction_context.max_bid_amount))
                 break
 

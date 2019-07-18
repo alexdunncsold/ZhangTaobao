@@ -3,8 +3,10 @@ from commenttextparser import parse_bid
 from datetime import datetime, timedelta
 from time import sleep
 
+from bid import Bid
 
-def login_to_facebook(webdriver, credentials):
+
+def login_to_facebook(webdriver, auction_context):
     print("Attempting to load https://www.facebook.com/ ...")
     webdriver.get("https://www.facebook.com/")
     if 'facebook' in webdriver.title.lower() \
@@ -13,11 +15,11 @@ def login_to_facebook(webdriver, credentials):
 
         email_elem = webdriver.find_element_by_id('email')
         email_elem.clear()
-        email_elem.send_keys(credentials.email)
+        email_elem.send_keys(auction_context.credentials.email)
 
         password_elem = webdriver.find_element_by_id('pass')
         password_elem.clear()
-        password_elem.send_keys(credentials.password)
+        password_elem.send_keys(auction_context.credentials.password)
 
         print("Logging in...")
         password_elem.send_keys(Keys.RETURN)
@@ -26,6 +28,11 @@ def login_to_facebook(webdriver, credentials):
         print("Already logged in.")
     else:
         raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')
+
+    auction_context.my_facebook_id = \
+    webdriver.find_element_by_class_name('_606w').get_attribute('href').split('https://www.facebook.com/')[1]
+    if auction_context.run_config == 'dev':
+        auction_context.my_facebook_id += '/dev'
 
 
 def load_auction_page(webdriver, context):
@@ -49,13 +56,22 @@ def remove_all_child_comments(webdriver):
 def parse_bid_history(webdriver, context):
     remove_all_child_comments(webdriver)
 
-    valid_bid_history = [0, ]
-    comment_elem_list = webdriver.find_elements_by_class_name('_3l3x')
+    valid_bid_history = [Bid(), ]
+    comment_elem_list = webdriver.find_elements_by_class_name('_6qw3')
     for comment in comment_elem_list:
+        comment_author_elem = comment.find_element_by_class_name('_6qw4')
+        comment_author = comment_author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
+        comment_text_elem = comment.find_element_by_class_name('_3l3x')
+        comment_text = comment_text_elem.text
+
+        # distinguish automated bids from manual bids in dev configuration
+        if '(autobid)' in comment_text:
+            comment_author += '/dev'
+
         try:
-            comment_bid_amount = parse_bid(comment.text)
-            if comment_bid_amount >= valid_bid_history[-1] + context.auction.min_bid_step:
-                valid_bid_history.append(comment_bid_amount)
+            comment_bid_amount = parse_bid(comment_text)
+            if comment_bid_amount >= valid_bid_history[-1].value + context.auction.min_bid_step:
+                valid_bid_history.append(Bid(comment_author, comment_bid_amount))
         except ValueError as err:
             pass
     return valid_bid_history

@@ -7,7 +7,8 @@ from time import sleep
 def login_to_facebook(webdriver, credentials):
     print("Attempting to load https://www.facebook.com/ ...")
     webdriver.get("https://www.facebook.com/")
-    if 'Facebook - Log In or Sign Up' in webdriver.title:
+    if 'facebook' in webdriver.title.lower() \
+            and 'log in or sign up' in webdriver.title.lower():
         print("Loaded Facebook login page!")
 
         email_elem = webdriver.find_element_by_id('email')
@@ -21,7 +22,7 @@ def login_to_facebook(webdriver, credentials):
         print("Logging in...")
         password_elem.send_keys(Keys.RETURN)
 
-    elif 'Facebook' in webdriver.title:
+    elif 'facebook' in webdriver.title.lower():
         print("Already logged in.")
     else:
         raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')

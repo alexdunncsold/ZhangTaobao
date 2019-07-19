@@ -45,7 +45,7 @@ try:
     next_bid_scheduled = None
     print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
 
-    while now < auction_context.auction.end_datetime + timedelta(seconds=5):
+    while now < auction_context.auction.end_datetime + timedelta(seconds=3):
         now = datetime.utcnow().replace(tzinfo=utc)
         try:
             valid_bid_history = parse_bid_history(driver, auction_context)

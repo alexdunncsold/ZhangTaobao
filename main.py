@@ -7,6 +7,8 @@ from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
 from webdriverhelper import get_webdriver
+
+from config import *
 from secrets import *
 
 loc_tz = timezone('America/Los_Angeles')
@@ -27,7 +29,7 @@ YOUR_MAX_BID = 17000
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
-auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP)
+auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP, extension_count)
 auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, run_config)
 driver = get_webdriver()
 
@@ -69,7 +71,15 @@ try:
                                         lowest_valid_bid) if run_config == 'precipice_test' else make_bid(
                     driver, auction_context, lowest_valid_bid)
 
-            # if currently outbid, and more courtesy bids required
+            # if it's time to snipe
+            elif auction_context.critical_period_active() \
+                    and valid_bid_history[-1].bidder != auction_context.my_facebook_id \
+                    and lowest_valid_bid <= auction_context.max_bid_amount:
+
+                print('Bid condition detected during critical period.')
+                make_bid(driver, auction_context, lowest_valid_bid)
+
+            # if currently outbid, and more courtesy bids required, schedule a courtesy bid
             elif valid_bid_history[-1].bidder != auction_context.my_facebook_id \
                     and auction_context.bids_placed < minimum_bids_to_save_face \
                     and lowest_valid_bid <= auction_context.max_bid_amount \
@@ -79,11 +89,11 @@ try:
                 print("Competing bid {} logged at {}".format(valid_bid_history[-1].value,
                                                              competing_bid_logged.astimezone(loc_tz)))
 
-                next_bid_scheduled = (competing_bid_logged + (
+                next_bid_scheduled = (competing_bid_logged + (1 / 10 if auction_context.run_config == 'dev' else 1) * (
                             auction_context.auction.end_datetime - competing_bid_logged) / 2).astimezone(loc_tz)
                 print('Next outbid scheduled for {}'.format(next_bid_scheduled))
 
-            # if it's time to make a scheduled courtesy bid
+            # if it's time to make a scheduled courtesy bid, make a bid
             elif next_bid_scheduled \
                     and now > next_bid_scheduled \
                     and lowest_valid_bid <= auction_context.max_bid_amount:
@@ -94,22 +104,7 @@ try:
                 competing_bid_logged = None
                 next_bid_scheduled = None
 
-            # if it's time to snipe
-            elif auction_context.critical_period_active() \
-                    and valid_bid_history[-1].bidder != auction_context.my_facebook_id \
-                    and lowest_valid_bid <= auction_context.max_bid_amount:
-
-                print('Bid condition detected during critical period.')
-
-                # extend auction immediately to avoid inaccuracy
-                if extension_count:
-                    extension_count -= 1
-                    print('Extending auction by 5min ({} extensions remaining)'.format(extension_count))
-                    auction_context.auction.end_datetime += timedelta(minutes=1 if run_config == 'dev' else 5)
-                    print('Auction end extended to {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
-
-                make_bid(driver, auction_context, lowest_valid_bid)
-
+            # if we're priced out of further bids, quit
             elif lowest_valid_bid > auction_context.max_bid_amount:
                 print('Minimum valid bid {} exceeds upper limit {} - quitting...'.format(
                     lowest_valid_bid, auction_context.max_bid_amount))

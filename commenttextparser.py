@@ -1,3 +1,5 @@
+from config import SANE_LOWER_BOUND, SANE_UPPER_BOUND
+
 def normalise_digits(comment_text):
     normalised_text = ''
     for char in comment_text:
@@ -28,10 +30,6 @@ def normalise_digits(comment_text):
         else:
             normalised_text += char
     return normalised_text
-
-
-SANE_LOWER_BOUND = 300
-SANE_UPPER_BOUND = 30000
 
 
 def is_sane_value(candidate_string):

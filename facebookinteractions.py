@@ -86,7 +86,9 @@ def make_bid(webdriver, auction_context, bid_amount):
     comment_form.click()
     reply_elem = comment_form.find_element_by_class_name("_5rpu")
     reply_elem.send_keys(str(bid_amount) + '(autobid)' if auction_context.run_config == 'dev' else str(bid_amount))
+
     print('Submitting bid of {}'.format(bid_amount))
+    auction_context.auction.trigger_extension()
     reply_elem.send_keys(Keys.RETURN)
     sleep(0.5)
 

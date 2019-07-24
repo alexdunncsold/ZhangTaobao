@@ -1,4 +1,5 @@
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
 from commenttextparser import parse_bid
 from datetime import datetime, timedelta
 from time import sleep
@@ -59,20 +60,23 @@ def parse_bid_history(webdriver, context):
     valid_bid_history = [Bid(), ]
     comment_elem_list = webdriver.find_elements_by_class_name('_6qw3')
     for comment in comment_elem_list:
-        comment_author_elem = comment.find_element_by_class_name('_6qw4')
-        comment_author = comment_author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
-        comment_text_elem = comment.find_element_by_class_name('_3l3x')
-        comment_text = comment_text_elem.text
-
-        # distinguish automated bids from manual bids in dev configuration
-        if '(autobid)' in comment_text:
-            comment_author += '/dev'
-
         try:
-            comment_bid_amount = parse_bid(comment_text)
-            if comment_bid_amount >= valid_bid_history[-1].value + context.auction.min_bid_step:
-                valid_bid_history.append(Bid(comment_author, comment_bid_amount))
-        except ValueError as err:
+            comment_text_elem = comment.find_element_by_class_name('_3l3x')
+            comment_text = comment_text_elem.text
+            comment_author_elem = comment.find_element_by_class_name('_6qw4')
+            comment_author = comment_author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
+
+            # distinguish automated bids from manual bids in dev configuration
+            if '(autobid)' in comment_text:
+                comment_author += '/dev'
+
+            try:
+                comment_bid_amount = parse_bid(comment_text)
+                if comment_bid_amount >= valid_bid_history[-1].value + context.auction.min_bid_step:
+                    valid_bid_history.append(Bid(comment_author, comment_bid_amount))
+            except ValueError as err:
+                pass
+        except NoSuchElementException as err:
             pass
     return valid_bid_history
 

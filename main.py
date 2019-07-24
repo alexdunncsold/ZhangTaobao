@@ -6,31 +6,41 @@ from auctioncontext import AuctionContext
 from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
+from performance_testing import ptest
 from webdriverhelper import get_webdriver
 
-from config import *
 from secrets import *
 
 loc_tz = timezone('America/Los_Angeles')
 
 #########################################################################################
-run_config = 'dev'  # dev, precipice_test, battlefield, storm
+run_config = 'dev'  # dev, battlefield, storm
 extension_count = 0
-PLACE_INITIAL_BID = True
-minimum_bids_to_save_face = 10 if run_config == 'dev' else 3
-POST_ID = '1312495965594068'
-AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 18, 21, 30, 00))
-AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(
-    minutes=3) if run_config == 'dev' else AUCTION_END
-STARTING_BID = 1
-BID_STEP = 50
-YOUR_MAX_BID = 17000
+PLACE_INITIAL_BID = False
+minimum_bids_to_save_face = 0
+POST_ID = '1315644905279174'
+AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 25, 10, 32, 00))
+STARTING_BID = 500
+BID_STEP = 100
+YOUR_MAX_BID = 10000
 #########################################################################################
+# #########################################################################################
+# run_config = 'storm'  # dev, battlefield, storm
+# extension_count = 0
+# PLACE_INITIAL_BID = False
+# minimum_bids_to_save_face = 10 if run_config == 'dev' else 0
+# POST_ID = '1325552150944774'
+# AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 25, 21, 20, 00))
+# STARTING_BID = 3000
+# BID_STEP = 50
+# YOUR_MAX_BID = 6500
+# #########################################################################################
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP, extension_count)
-auction_context = AuctionContext(credentials, auction_group, auction, YOUR_MAX_BID, run_config)
+auction_context = AuctionContext(credentials, auction_group, auction,
+                                 YOUR_MAX_BID, minimum_bids_to_save_face, run_config)
 driver = get_webdriver()
 
 try:
@@ -41,24 +51,41 @@ try:
     load_auction_page(driver, auction_context)
 
     now = datetime.utcnow().replace(tzinfo=utc)
-    competing_bid_logged = None
-    next_bid_scheduled = None
-    print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(loc_tz)))
+    competing_bid_logged = None  # todo move to Auction_Context
+    next_bid_scheduled = None  # todo move to Auction_Context
+
+    # todo print name of item
+    print(
+        f"Bidding to a maximum of {auction_context.max_bid_amount}")  # todo move all these prints to a Auction_Context helper function
+    print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(
+        loc_tz)))  # todo move all these prints to a Auction_Context helper function
+
+    auction_context.refresh_bid_history(driver)  # todo move all these prints to a Auction_Context init function
+    auction_context.print_bid_history()  # todo move all these prints to a Auction_Context helper function
 
     while now < auction_context.auction.end_datetime + timedelta(seconds=3):
-        now = datetime.utcnow().replace(tzinfo=utc)
-        try:
-            valid_bid_history = parse_bid_history(driver, auction_context)
 
-            lowest_valid_bid = max(auction.min_bid_amount, valid_bid_history[-1].value + auction.min_bid_step)
+        now = datetime.utcnow().replace(tzinfo=utc)
+
+        try:
+            auction_context.refresh_bid_history(driver)
+            lowest_valid_bid = max(auction.min_bid_amount,
+                                   auction_context.get_current_winning_bid().value + auction.min_bid_step)  # todo add to AuctionContext
 
             # if currently winning
-            if valid_bid_history[-1].bidder == auction_context.my_facebook_id \
-                    and (run_config != 'dev' or valid_bid_history[-1] == auction_context.my_active_bid):
+            if auction_context.get_current_winning_bid().bidder == auction_context.my_facebook_id \
+                    and (
+                    run_config != 'dev' or auction_context.get_current_winning_bid() == auction_context.my_active_bid):
                 charlie_sheen = '#Winning'
 
+            # if we're priced out of further bids, quit
+            elif lowest_valid_bid > auction_context.max_bid_amount:
+                print('Minimum valid bid {} exceeds upper limit {} - quitting...'.format(
+                    lowest_valid_bid, auction_context.max_bid_amount))
+                break
+
             # if auction_context corrupted
-            elif auction_context.my_active_bid > valid_bid_history[-1].value:
+            elif auction_context.my_active_bid > auction_context.get_current_winning_bid().value:
                 raise RuntimeError('main(): Active bid not reflected in bid history, auction state corrupted.')
 
             # if initial bid needs to be placed
@@ -67,27 +94,24 @@ try:
                     and lowest_valid_bid <= auction_context.max_bid_amount:
 
                 print('Placing initial bid.')
-                make_bid_without_submit(driver, auction_context,
-                                        lowest_valid_bid) if run_config == 'precipice_test' else make_bid(
-                    driver, auction_context, lowest_valid_bid)
+                make_bid(driver, auction_context, lowest_valid_bid)
 
             # if it's time to snipe
             elif auction_context.critical_period_active() \
-                    and valid_bid_history[-1].bidder != auction_context.my_facebook_id \
-                    and lowest_valid_bid <= auction_context.max_bid_amount:
+                    and auction_context.get_current_winning_bid().bidder != auction_context.my_facebook_id \
+                    and lowest_valid_bid <= auction_context.max_bid_amount:  # todo make winning check a helper function of AuctionContext
 
                 print('Bid condition detected during critical period.')
                 make_bid(driver, auction_context, lowest_valid_bid)
 
             # if currently outbid, and more courtesy bids required, schedule a courtesy bid
-            elif valid_bid_history[-1].bidder != auction_context.my_facebook_id \
+            elif auction_context.get_current_winning_bid().bidder != auction_context.my_facebook_id \
                     and auction_context.bids_placed < minimum_bids_to_save_face \
                     and lowest_valid_bid <= auction_context.max_bid_amount \
                     and competing_bid_logged is None:
 
                 competing_bid_logged = datetime.utcnow().replace(tzinfo=utc)
-                print("Competing bid {} logged at {}".format(valid_bid_history[-1].value,
-                                                             competing_bid_logged.astimezone(loc_tz)))
+                print("Competing bid logged at {}".format(competing_bid_logged.astimezone(loc_tz)))
 
                 next_bid_scheduled = (competing_bid_logged + (1 / 10 if auction_context.run_config == 'dev' else 1) * (
                             auction_context.auction.end_datetime - competing_bid_logged) / 2).astimezone(loc_tz)
@@ -104,12 +128,6 @@ try:
                 competing_bid_logged = None
                 next_bid_scheduled = None
 
-            # if we're priced out of further bids, quit
-            elif lowest_valid_bid > auction_context.max_bid_amount:
-                print('Minimum valid bid {} exceeds upper limit {} - quitting...'.format(
-                    lowest_valid_bid, auction_context.max_bid_amount))
-                break
-
         except StaleElementReferenceException as err:
             # This will occur when a comment posts during iteration through the comments
             # It can be safely ignored, as the bid will process during the next iteration
@@ -117,6 +135,8 @@ try:
             pass
 
 finally:
+    print('Final Auction State:')
+    auction_context.print_bid_history()
     print('Quitting webdriver...')
     driver.quit()
     print('Complete.')

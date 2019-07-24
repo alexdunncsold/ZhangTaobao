@@ -8,3 +8,6 @@ class Bid:
 
         if (value is None or value is 0) and bidder is not None:
             raise RuntimeError("Bid::__init__(): A bid must specify both bidder and value, or neither.")
+
+    def __gt__(self, other):
+        return self.value > other.value

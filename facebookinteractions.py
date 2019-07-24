@@ -67,7 +67,7 @@ def make_bid(webdriver, auction_context, bid_amount):
     print('    Submitting {}'.format(bid_amount))
     auction_context.auction.trigger_extension()
     reply_elem.send_keys(Keys.RETURN)
-    sleep(0.2)
+    sleep(0.05)
 
     auction_context.my_active_bid = bid_amount
     auction_context.bids_placed += 1

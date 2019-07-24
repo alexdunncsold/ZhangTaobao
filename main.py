@@ -54,9 +54,13 @@ try:
     competing_bid_logged = None  # todo move to Auction_Context
     next_bid_scheduled = None  # todo move to Auction_Context
 
-    # todo print name of item
+    try:
+        item_name = driver.find_element_by_class_name('_l53').text;
+    except NoSuchElementException:
+        item_name = 'NoNameFound'
+
     print(
-        f"Bidding to a maximum of {auction_context.max_bid_amount}")  # todo move all these prints to a Auction_Context helper function
+        f"Bidding as {auction_context.my_facebook_id} on {item_name} to a maximum of {auction_context.max_bid_amount} in steps of {auction_context.auction.min_bid_step}")  # todo move all these prints to a Auction_Context helper function
     print('Auction ends {}'.format(auction_context.auction.end_datetime.astimezone(
         loc_tz)))  # todo move all these prints to a Auction_Context helper function
 

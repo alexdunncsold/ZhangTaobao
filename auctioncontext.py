@@ -28,7 +28,7 @@ class AuctionContext:
         assert self.auction is not None
         assert self.max_bid_amount is not None
 
-        assert max_bid_amount > self.auction.min_bid_amount
+        assert max_bid_amount >= self.auction.min_bid_amount
 
     def critical_period_active(self):
         now = datetime.utcnow().replace(tzinfo=utc)

@@ -110,7 +110,7 @@ try:
 
             # if currently outbid, and more courtesy bids required, schedule a courtesy bid
             elif auction_context.get_current_winning_bid().bidder != auction_context.my_facebook_id \
-                    and auction_context.bids_placed < minimum_bids_to_save_face \
+                    and auction_context.bids_placed < auction_context.minimum_bids_to_save_face \
                     and lowest_valid_bid <= auction_context.max_bid_amount \
                     and competing_bid_logged is None:
 

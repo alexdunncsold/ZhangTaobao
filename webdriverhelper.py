@@ -17,5 +17,10 @@ def get_webdriver():
     else:
         raise RuntimeError('Error while setting webdriver options: platform {} not supported.'.format(platform))
     driver = webdriver.Chrome(options=options)
+
+    # Set big screen size for screencap of history
+    if platform == 'linux':
+        driver.set_window_size(1000, 2000)
+
     print('Driver instantiated.')
     return driver

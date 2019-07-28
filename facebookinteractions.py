@@ -1,10 +1,8 @@
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
-from commenttextparser import parse_bid
 from datetime import datetime, timedelta
 from time import sleep
-
-from bid import Bid
+import os
 
 
 def login_to_facebook(webdriver, auction_context):
@@ -71,3 +69,12 @@ def make_bid(webdriver, auction_context, bid_amount):
 
     auction_context.my_active_bid = bid_amount
     auction_context.bids_placed += 1
+
+    take_screenshot(webdriver)
+
+
+def take_screenshot(webdriver):
+    now = datetime.now()
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    SCREENSHOTS_FOLDER = os.path.join(BASE_DIR, 'screenshots')
+    webdriver.save_screenshot(os.path.join(f'{SCREENSHOTS_FOLDER}{now.timestamp()}.png'))

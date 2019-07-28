@@ -6,7 +6,6 @@ from auctioncontext import AuctionContext
 from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
-from performance_testing import ptest
 from webdriverhelper import get_webdriver
 
 from secrets import *
@@ -14,27 +13,15 @@ from secrets import *
 loc_tz = timezone('America/Los_Angeles')
 
 #########################################################################################
-run_config = 'dev'  # dev, battlefield, storm
+run_config = 'battlefield'  # dev, battlefield, storm
 extension_count = 0
 PLACE_INITIAL_BID = False
 minimum_bids_to_save_face = 0
-POST_ID = '1315644905279174'
-AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 25, 10, 32, 00))
-STARTING_BID = 500
+POST_ID = '603869066686545'
+AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 29, 21, 19, 59))
+STARTING_BID = 100
 BID_STEP = 100
-YOUR_MAX_BID = 10000
-#########################################################################################
-# #########################################################################################
-# run_config = 'storm'  # dev, battlefield, storm
-# extension_count = 0
-# PLACE_INITIAL_BID = False
-# minimum_bids_to_save_face = 10 if run_config == 'dev' else 0
-# POST_ID = '1325552150944774'
-# AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 25, 21, 20, 00))
-# STARTING_BID = 3000
-# BID_STEP = 50
-# YOUR_MAX_BID = 6500
-# #########################################################################################
+YOUR_MAX_BID = 3800
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
@@ -55,7 +42,7 @@ try:
     next_bid_scheduled = None  # todo move to Auction_Context
 
     try:
-        item_name = driver.find_element_by_class_name('_l53').text;
+        item_name = driver.find_element_by_class_name('_l53').text
     except NoSuchElementException:
         item_name = 'NoNameFound'
 

@@ -137,6 +137,10 @@ finally:
 
     take_screenshot(driver)
 
+    with open('final_state_dump.html', 'w+') as out:
+        out.write(driver.page_source)
+        out.close()
+
     print('Final Auction State:')
     auction_context.print_bid_history()
 

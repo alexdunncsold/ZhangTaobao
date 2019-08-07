@@ -6,6 +6,7 @@ from math import ceil
 from performance_testing import *
 from pytz import utc
 from selenium.common.exceptions import NoSuchElementException
+from timesync import get_offset
 
 
 class AuctionContext:
@@ -15,6 +16,8 @@ class AuctionContext:
     valid_bid_history = []
     my_valid_bid_count = 0
     latest_time_notification = None
+    sync_time_at = timedelta(minutes=5)
+    posting_delay = None
 
     def __init__(self, credentials, facebook_group, auction,
                  max_bid_amount, minimum_bids_to_save_face, run_config):
@@ -33,8 +36,13 @@ class AuctionContext:
         assert max_bid_amount >= self.auction.min_bid_amount
 
     def critical_period_active(self):
-        now = datetime.utcnow().replace(tzinfo=utc)
-        return self.auction.end_datetime - timedelta(seconds=5) < now < self.auction.end_datetime + timedelta(seconds=3)
+        return self.get_time_remaining() < timedelta(seconds=5)
+
+    def get_time_remaining(self):
+        time_remaining = self.auction.end_datetime - datetime.utcnow().replace(tzinfo=utc)
+        if self.posting_delay:
+            time_remaining -= self.posting_delay
+        return time_remaining
 
     def get_current_winning_bid(self):
         if self.valid_bid_history:
@@ -72,7 +80,7 @@ class AuctionContext:
 
             # Print console notifications
             if not self.auction.expired:
-                time_remaining = self.auction.end_datetime - datetime.utcnow().replace(tzinfo=utc)
+                time_remaining = self.get_time_remaining()
                 if time_remaining.days == -1:
                     self.auction.expired = True
                     take_screenshot(webdriver)
@@ -83,8 +91,6 @@ class AuctionContext:
                 elif time_remaining.seconds != self.latest_time_notification.seconds:
                     self.latest_time_notification = time_remaining
                     print(f'{time_remaining.seconds + 1} seconds remaining!')
-
-
 
             # Look for the most recent bid gte the known high bid and consider that to be the high bid
             for comment in reversed(comment_elem_list):
@@ -159,3 +165,7 @@ class AuctionContext:
         if not self.auction.expired:
             print(
                 f'{self.my_facebook_id} has made {self.my_valid_bid_count} valid bids so far ({self.minimum_bids_to_save_face} required)')
+
+    def sync_time(self, webdriver):
+        print('Syncing time with fb server...')
+        self.posting_delay = get_offset(webdriver, self)

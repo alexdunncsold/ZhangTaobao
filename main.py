@@ -8,21 +8,23 @@ from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
 from webdriverhelper import get_webdriver
 
+from timesync import get_short_expiry, get_offset, get_post_registered
+
 from secrets import *
 
 loc_tz = timezone('America/Los_Angeles')
 
 #########################################################################################
-run_config = 'battlefield'  # dev, battlefield, storm
+run_config = 'dev'  # dev, battlefield, storm
 extension_count = 0
 PLACE_INITIAL_BID = False
 minimum_bids_to_save_face = 0
-POST_ID = '608650902875028'
+POST_ID = '1319918928185105'
 # AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 8, 7, 21, 19, 59))
-AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(seconds=45)
+AUCTION_END = get_short_expiry()
 STARTING_BID = 100
 BID_STEP = 100
-YOUR_MAX_BID = 200
+YOUR_MAX_BID = 3600
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
@@ -55,29 +57,27 @@ try:
     auction_context.refresh_bid_history(driver)  # todo move all these prints to a Auction_Context init function
     auction_context.print_bid_history()  # todo move all these prints to a Auction_Context helper function
 
-    while now < auction_context.auction.end_datetime + timedelta(seconds=3):
-        now = datetime.utcnow().replace(tzinfo=utc)
-
+    while now < auction_context.auction.end_datetime + timedelta(seconds=1):
         try:
             auction_context.refresh_bid_history(driver)
             lowest_valid_bid = max(auction.min_bid_amount,
                                    auction_context.get_current_winning_bid().value + auction.min_bid_step)  # todo add to AuctionContext
 
             # if currently winning
-            if auction_context.get_current_winning_bid().bidder == auction_context.my_facebook_id \
-                    and (
-                    run_config != 'dev' or auction_context.get_current_winning_bid() == auction_context.my_active_bid):
-                charlie_sheen = '#Winning'
+            if auction_context.get_current_winning_bid().bidder == auction_context.my_facebook_id:
+                # sit pretty
+                pass
 
-            # if we're priced out of further bids, quit
+            # if we're outbid, and priced out of further bids, quit
             elif lowest_valid_bid > auction_context.max_bid_amount:
                 print('Minimum valid bid {} exceeds upper limit {} - quitting...'.format(
                     lowest_valid_bid, auction_context.max_bid_amount))
                 break
 
-            # if auction_context corrupted
-            elif auction_context.my_active_bid > auction_context.get_current_winning_bid().value:
-                raise RuntimeError('main(): Active bid not reflected in bid history, auction state corrupted.')
+            # if it's time to strike
+            elif now > auction_context.auction.end_datetime - timedelta(milliseconds=100):
+                print(f'Sniping with a bid of {lowest_valid_bid}')
+                make_bid(driver, auction_context, lowest_valid_bid)
 
             # if initial bid needs to be placed
             elif PLACE_INITIAL_BID \
@@ -85,14 +85,6 @@ try:
                     and lowest_valid_bid <= auction_context.max_bid_amount:
 
                 print('Placing initial bid.')
-                make_bid(driver, auction_context, lowest_valid_bid)
-
-            # if it's time to snipe
-            elif auction_context.critical_period_active() \
-                    and auction_context.get_current_winning_bid().bidder != auction_context.my_facebook_id \
-                    and lowest_valid_bid <= auction_context.max_bid_amount:  # todo make winning check a helper function of AuctionContext
-
-                print('Bid condition detected during critical period.')
                 make_bid(driver, auction_context, lowest_valid_bid)
 
             # if currently outbid, and more courtesy bids required, schedule a courtesy bid
@@ -124,6 +116,19 @@ try:
             # It can be safely ignored, as the bid will process during the next iteration
             # print("DOM updated while attempting to bid - bid skipped, iteration continues")
             pass
+
+        # Trigger posting-delay synchronisation
+        if not auction_context.posting_delay \
+                and now > auction_context.auction.end_datetime - auction_context.sync_time_at:
+            auction_context.sync_time(driver)
+            load_auction_page(driver, auction_context)
+
+        # Update value of now
+        if auction_context.posting_delay:
+            now = datetime.utcnow().replace(tzinfo=utc) + auction_context.posting_delay
+        else:
+            now = datetime.utcnow().replace(tzinfo=utc)
+
 except Exception as err:
     print(err.__repr__())
     with open('err_dump.html', 'w+') as out:
@@ -137,9 +142,9 @@ finally:
 
     take_screenshot(driver)
 
-    with open('final_state_dump.html', 'w+') as out:
-        out.write(driver.page_source)
-        out.close()
+    # with open('final_state_dump.html', 'w+') as out:
+    #     out.write(driver.page_source)
+    #     out.close()
 
     print('Final Auction State:')
     auction_context.print_bid_history()

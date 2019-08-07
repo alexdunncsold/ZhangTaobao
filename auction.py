@@ -7,7 +7,7 @@ class Auction:
     id = ''
     end_datetime = None
     expired = False
-    extensions_remaining = 0
+    total_extensions = 0
     min_bid_step = None
     min_bid_amount = None
 
@@ -26,13 +26,6 @@ class Auction:
 
         self.id = id
         self.end_datetime = end_datetime
-        self.extensions_remaining = extensions
+        self.total_extensions = extensions
         self.min_bid_step = min_bid_step
         self.min_bid_amount = min_bid_amount
-
-    def trigger_extension(self):
-        if self.extensions_remaining > 0 \
-                and datetime.utcnow().replace(tzinfo=utc) > self.end_datetime - timedelta(minutes=5):
-            self.end_datetime += timedelta(minutes=5)
-            self.extensions_remaining -= 1
-            print('Bid placed in final 5min - auction time extended to {}'.format(self.end_datetime))

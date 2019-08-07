@@ -16,7 +16,7 @@ loc_tz = timezone('America/Los_Angeles')
 
 #########################################################################################
 run_config = 'dev'  # dev, battlefield, storm
-extension_count = 0
+extension_count = 2
 PLACE_INITIAL_BID = False
 minimum_bids_to_save_face = 0
 POST_ID = '1319918928185105'

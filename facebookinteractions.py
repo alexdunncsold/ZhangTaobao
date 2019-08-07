@@ -131,7 +131,7 @@ def make_bid(webdriver, auction_context, bid_amount):
 
     post_comment(webdriver, bid_content)
 
-    auction_context.auction.trigger_extension()
+    auction_context.trigger_extension()
     sleep(0.05)
     auction_context.my_active_bid = bid_amount
     auction_context.bids_placed += 1

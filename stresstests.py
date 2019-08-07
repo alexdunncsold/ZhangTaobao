@@ -44,6 +44,8 @@ try:
 
     now = datetime.utcnow().replace(tzinfo=utc) + posting_delay
     while now < auction_context.auction.end_datetime:
+        # Bear in mind that passing this test isn't a guarantee that it will work in production.
+        # Test multiple times against a simulated auction
         if now > auction_context.auction.end_datetime - timedelta(milliseconds=100):
             print(f'Bidding at adjusted system time {now.strftime("%H:%M (%S.%fsec)")}')
             make_bid(driver, auction_context, 500)

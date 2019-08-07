@@ -3,10 +3,11 @@ from facebookinteractions import *
 from pytz import utc
 
 
+# Returns an auction expiry ending at XX:XX:00.000000
 def get_short_expiry():
     t = datetime.utcnow().replace(tzinfo=utc)
-    new_minutes = t.minute + 1 if t.second < 30 else t.minute + 2
-    return datetime(t.year, t.month, t.day, t.hour, new_minutes, 0, 0, tzinfo=utc)
+    t += timedelta(minutes=1) if t.second < 30 else timedelta(minutes=2)
+    return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
 
 def get_offset(webdriver, context):

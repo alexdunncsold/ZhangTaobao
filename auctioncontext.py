@@ -24,6 +24,7 @@ class AuctionContext:
         self.credentials = credentials
         self.facebook_group = facebook_group
         self.auction = auction
+        self.extensions_remaining = self.auction.total_extensions
         self.max_bid_amount = max_bid_amount
         self.minimum_bids_to_save_face = minimum_bids_to_save_face
         self.run_config = run_config
@@ -43,6 +44,13 @@ class AuctionContext:
         if self.posting_delay:
             time_remaining -= self.posting_delay
         return time_remaining
+
+    def trigger_extension(self):
+        if self.extensions_remaining > 0 \
+                and self.get_time_remaining() < timedelta(minutes=5):
+            self.auction.end_datetime += timedelta(minutes=(5 if self.run_config != 'dev' else 1))
+            self.extensions_remaining -= 1
+            print('Bid placed in final 5min - auction time extended to {}'.format(self.auction.end_datetime))
 
     def get_current_winning_bid(self):
         if self.valid_bid_history:

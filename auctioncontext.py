@@ -1,7 +1,8 @@
 from bid import Bid
 from commenttextparser import parse_bid
 from datetime import datetime, timedelta
-from facebookinteractions import remove_all_child_comments
+from facebookinteractions import remove_all_child_comments, take_screenshot
+from math import ceil
 from performance_testing import *
 from pytz import utc
 from selenium.common.exceptions import NoSuchElementException
@@ -13,6 +14,7 @@ class AuctionContext:
     bids_placed = 0
     valid_bid_history = []
     my_valid_bid_count = 0
+    latest_time_notification = None
 
     def __init__(self, credentials, facebook_group, auction,
                  max_bid_amount, minimum_bids_to_save_face, run_config):
@@ -32,7 +34,7 @@ class AuctionContext:
 
     def critical_period_active(self):
         now = datetime.utcnow().replace(tzinfo=utc)
-        return now > self.auction.end_datetime - timedelta(seconds=5)
+        return self.auction.end_datetime - timedelta(seconds=5) < now < self.auction.end_datetime + timedelta(seconds=3)
 
     def get_current_winning_bid(self):
         if self.valid_bid_history:
@@ -67,6 +69,22 @@ class AuctionContext:
         if self.critical_period_active():
             valid_bid_history = self.valid_bid_history
             valid_bid_found = False
+
+            # Print console notifications
+            if not self.auction.expired:
+                time_remaining = self.auction.end_datetime - datetime.utcnow().replace(tzinfo=utc)
+                if time_remaining.days == -1:
+                    self.auction.expired = True
+                    take_screenshot(webdriver)
+                    print('Auction complete!')
+                elif not self.latest_time_notification:
+                    self.latest_time_notification = time_remaining
+                    print(f'{time_remaining.seconds + 1} seconds remaining - critical period active!')
+                elif time_remaining.seconds != self.latest_time_notification.seconds:
+                    self.latest_time_notification = time_remaining
+                    print(f'{time_remaining.seconds + 1} seconds remaining!')
+
+
 
             # Look for the most recent bid gte the known high bid and consider that to be the high bid
             for comment in reversed(comment_elem_list):
@@ -138,5 +156,6 @@ class AuctionContext:
         print('Current Bid History:')
         for bid in self.valid_bid_history:
             self.print_bid(bid)
-        print(
-            f'{self.my_facebook_id} has made {self.my_valid_bid_count} valid bids so far ({self.minimum_bids_to_save_face} required)')
+        if not self.auction.expired:
+            print(
+                f'{self.my_facebook_id} has made {self.my_valid_bid_count} valid bids so far ({self.minimum_bids_to_save_face} required)')

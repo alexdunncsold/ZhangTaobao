@@ -20,7 +20,7 @@ def get_webdriver():
 
     # Set big screen size for screencap of history
     if platform == 'linux':
-        driver.set_window_size(1000, 2000)
+        driver.set_window_size(1000, 3000)
 
     print('Driver instantiated.')
     return driver

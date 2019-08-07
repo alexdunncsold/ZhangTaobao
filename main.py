@@ -17,11 +17,12 @@ run_config = 'battlefield'  # dev, battlefield, storm
 extension_count = 0
 PLACE_INITIAL_BID = False
 minimum_bids_to_save_face = 0
-POST_ID = '603869066686545'
-AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 7, 29, 21, 19, 59))
+POST_ID = '608650902875028'
+# AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 8, 7, 21, 19, 59))
+AUCTION_END = datetime.utcnow().replace(tzinfo=utc) + timedelta(seconds=45)
 STARTING_BID = 100
 BID_STEP = 100
-YOUR_MAX_BID = 3800
+YOUR_MAX_BID = 200
 
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
@@ -55,7 +56,6 @@ try:
     auction_context.print_bid_history()  # todo move all these prints to a Auction_Context helper function
 
     while now < auction_context.auction.end_datetime + timedelta(seconds=3):
-
         now = datetime.utcnow().replace(tzinfo=utc)
 
         try:
@@ -124,10 +124,22 @@ try:
             # It can be safely ignored, as the bid will process during the next iteration
             # print("DOM updated while attempting to bid - bid skipped, iteration continues")
             pass
-
+except Exception as err:
+    print(err.__repr__())
+    with open('err_dump.html', 'w+') as out:
+        out.write(driver.page_source)
+        out.close()
 finally:
+    print('Performing final refresh of page and bid history...')
+    load_auction_page(driver, auction_context)
+    auction_context.refresh_bid_history(driver)
+    print('Refreshed!')
+
+    take_screenshot(driver)
+
     print('Final Auction State:')
     auction_context.print_bid_history()
+
     print('Quitting webdriver...')
     driver.quit()
     print('Complete.')

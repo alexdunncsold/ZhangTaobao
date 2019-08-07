@@ -1,8 +1,65 @@
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
 from datetime import datetime, timedelta
 from time import sleep
 import os
+
+
+def continue_security_process(webdriver):
+    continue_button = webdriver.find_elements_by_id('checkpointSubmitButton')
+    if continue_button:
+        action = ActionChains(webdriver)
+        action.move_to_element_with_offset(continue_button[0], 5, 5).click().perform()
+        sleep(3)
+    else:
+        print("Failed to select a security continue button...")
+
+
+def process_facebook_security_check(webdriver):
+    print('Security check activated!')
+    print('You have ten seconds to approve this login...')
+
+    continue_security_process(webdriver)
+
+    external_approval_button = webdriver.find_elements_by_id('u_3_1')
+    if external_approval_button:
+        action = ActionChains(webdriver)
+        action.move_to_element_with_offset(external_approval_button[0], 2, 2).click().perform()
+        sleep(0.1)
+    else:
+        print('Failed to select external-approval radio button.')
+
+    continue_security_process(webdriver)
+    continue_security_process(webdriver)
+    continue_security_process(webdriver)
+
+
+def establish_persistent_facebook_login(webdriver, email, password):
+    print("Attempting to load https://www.facebook.com/ ...")
+    webdriver.get("https://www.facebook.com/")
+    if 'facebook' in webdriver.title.lower() \
+            and 'log in or sign up' in webdriver.title.lower():
+        print("Loaded Facebook login page!")
+
+        email_elem = webdriver.find_element_by_id('email')
+        email_elem.clear()
+        email_elem.send_keys(email)
+
+        password_elem = webdriver.find_element_by_id('pass')
+        password_elem.clear()
+        password_elem.send_keys(password)
+
+        print("Logging in...")
+        password_elem.send_keys(Keys.RETURN)
+
+    elif 'facebook' in webdriver.title.lower():
+        print("Already logged in.")
+    else:
+        raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')
+
+    if webdriver.find_elements_by_id('checkpointSubmitButton'):
+        process_facebook_security_check(webdriver)
 
 
 def login_to_facebook(webdriver, auction_context):
@@ -27,6 +84,9 @@ def login_to_facebook(webdriver, auction_context):
         print("Already logged in.")
     else:
         raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')
+
+    if webdriver.find_elements_by_id('checkpointSubmitButton'):
+        process_facebook_security_check(webdriver)
 
     auction_context.my_facebook_id = \
     webdriver.find_element_by_class_name('_606w').get_attribute('href').split('https://www.facebook.com/')[1]
@@ -70,11 +130,10 @@ def make_bid(webdriver, auction_context, bid_amount):
     auction_context.my_active_bid = bid_amount
     auction_context.bids_placed += 1
 
-    take_screenshot(webdriver)
-
 
 def take_screenshot(webdriver):
     now = datetime.now()
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     SCREENSHOTS_FOLDER = os.path.join(BASE_DIR, 'screenshots')
     webdriver.save_screenshot(os.path.join(f'{SCREENSHOTS_FOLDER}{now.timestamp()}.png'))
+    print('Screenshot saved!')

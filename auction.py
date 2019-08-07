@@ -6,6 +6,7 @@ from config import SANE_UPPER_BOUND, SANE_LOWER_BOUND
 class Auction:
     id = ''
     end_datetime = None
+    expired = False
     extensions_remaining = 0
     min_bid_step = None
     min_bid_amount = None

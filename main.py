@@ -75,7 +75,7 @@ try:
                 break
 
             # if it's time to strike
-            elif now > auction_context.auction.end_datetime - timedelta(milliseconds=100):
+            elif now > auction_context.auction.end_datetime - timedelta(milliseconds=250):
                 print(f'Sniping with a bid of {lowest_valid_bid}')
                 make_bid(driver, auction_context, lowest_valid_bid)
 

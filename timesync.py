@@ -5,7 +5,7 @@ from pytz import utc
 
 def get_short_expiry():
     t = datetime.utcnow().replace(tzinfo=utc)
-    new_minutes = t.minute + 1 if t.second < 45 else t.minute + 2
+    new_minutes = t.minute + 1 if t.second < 30 else t.minute + 2
     return datetime(t.year, t.month, t.day, t.hour, new_minutes, 0, 0, tzinfo=utc)
 
 

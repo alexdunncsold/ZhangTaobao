@@ -30,7 +30,7 @@ auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP, extension_count)
 auction_context = AuctionContext(credentials, auction_group, auction,
                                  YOUR_MAX_BID, minimum_bids_to_save_face, run_config)
-driver = get_webdriver()
+driver = get_webdriver(MY_FB_USER_ID)
 
 try:
 

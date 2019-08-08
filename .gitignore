@@ -4,3 +4,4 @@ venv
 *.log
 screenshots/
 *.html
+chrome-data/

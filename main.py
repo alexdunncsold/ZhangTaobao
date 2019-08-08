@@ -19,8 +19,8 @@ run_config = 'dev'  # dev, battlefield, storm
 extension_count = 2
 PLACE_INITIAL_BID = False
 minimum_bids_to_save_face = 0
-POST_ID = '1319918928185105'
-# AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 8, 7, 21, 19, 59))
+POST_ID = '1336050813228241' if run_config is not 'dev' else '1319918928185105'
+# AUCTION_END = timezone(TIMEZONES[run_config]).localize(datetime(2019, 8, 8, 22, 00, 00))
 AUCTION_END = get_short_expiry()
 STARTING_BID = 100
 BID_STEP = 100
@@ -31,7 +31,7 @@ auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP, extension_count)
 auction_context = AuctionContext(credentials, auction_group, auction,
                                  YOUR_MAX_BID, minimum_bids_to_save_face, run_config)
-driver = get_webdriver()
+driver = get_webdriver(MY_FB_USER_ID)
 
 try:
     # Perform Login
@@ -75,7 +75,7 @@ try:
                 break
 
             # if it's time to strike
-            elif now > auction_context.auction.end_datetime - timedelta(milliseconds=250):
+            elif now > auction_context.auction.end_datetime - timedelta(milliseconds=350):
                 print(f'Sniping with a bid of {lowest_valid_bid}')
                 make_bid(driver, auction_context, lowest_valid_bid)
 

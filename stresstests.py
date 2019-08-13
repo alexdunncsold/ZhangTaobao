@@ -2,7 +2,7 @@ from selenium.common.exceptions import StaleElementReferenceException
 from pytz import timezone, utc
 
 from auction import Auction
-from auctioncontext import AuctionContext
+from supervisor import Supervisor
 from facebookinteractions import *
 from facebookcredentials import FacebookCredentials
 from facebookgroup import FacebookGroup
@@ -28,8 +28,8 @@ YOUR_MAX_BID = 5000
 credentials = FacebookCredentials(MY_FB_EMAIL_ADDRESS, MY_FB_PASSWORD)
 auction_group = FacebookGroup(GROUP_NAMES[run_config], GROUP_IDS[run_config])
 auction = Auction(POST_ID, AUCTION_END, STARTING_BID, BID_STEP, extension_count)
-auction_context = AuctionContext(credentials, auction_group, auction,
-                                 YOUR_MAX_BID, minimum_bids_to_save_face, run_config)
+auction_context = Supervisor(credentials, auction_group, auction,
+                             YOUR_MAX_BID, minimum_bids_to_save_face, run_config)
 driver = get_webdriver(MY_FB_USER_ID)
 
 try:

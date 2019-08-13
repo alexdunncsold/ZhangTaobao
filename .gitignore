@@ -5,3 +5,5 @@ venv
 screenshots/
 *.html
 chrome-data/
+instance_config.ini
+account_config.ini

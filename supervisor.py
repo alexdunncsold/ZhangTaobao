@@ -9,7 +9,7 @@ from selenium.common.exceptions import NoSuchElementException
 from timesync import get_offset
 
 
-class AuctionContext:
+class Supervisor:
     my_facebook_id = ''
     my_active_bid = 0
     bids_placed = 0

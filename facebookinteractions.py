@@ -35,33 +35,6 @@ def process_facebook_security_check(webdriver):
     continue_security_process(webdriver)
 
 
-def establish_persistent_facebook_login(webdriver, email, password):
-    print("Attempting to load https://www.facebook.com/ ...")
-    webdriver.get("https://www.facebook.com/")
-    if 'facebook' in webdriver.title.lower() \
-            and 'log in or sign up' in webdriver.title.lower():
-        print("Loaded Facebook login page!")
-
-        email_elem = webdriver.find_element_by_id('email')
-        email_elem.clear()
-        email_elem.send_keys(email)
-
-        password_elem = webdriver.find_element_by_id('pass')
-        password_elem.clear()
-        password_elem.send_keys(password)
-
-        print("Logging in...")
-        password_elem.send_keys(Keys.RETURN)
-
-    elif 'facebook' in webdriver.title.lower():
-        print("Already logged in.")
-    else:
-        raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')
-
-    if webdriver.find_elements_by_id('checkpointSubmitButton'):
-        process_facebook_security_check(webdriver)
-
-
 def login_to_facebook(webdriver, auction_context):
     print("Attempting to load https://www.facebook.com/ ...")
     webdriver.get("https://www.facebook.com/")

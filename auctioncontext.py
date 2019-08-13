@@ -69,8 +69,11 @@ class AuctionContext:
         return comment_author
 
     def get_comment_text(self, comment):
-        comment_text_elem = comment.find_element_by_class_name('_3l3x')
-        comment_text = comment_text_elem.text
+        try:
+            comment_text_elem = comment.find_element_by_class_name('_3l3x')
+            comment_text = comment_text_elem.text
+        except Exception as err:
+            comment_text = ''
         return comment_text
 
     def refresh_bid_history(self, webdriver):
@@ -144,22 +147,21 @@ class AuctionContext:
                     if '(autobid)' in comment_text:
                         comment_author += '/dev'
 
-                    try:
-                        comment_bid_amount = parse_bid(comment_text)
+                    comment_bid_amount = parse_bid(comment_text)
 
-                        if not valid_bid_history \
-                                or comment_bid_amount >= valid_bid_history[-1].value + self.auction.min_bid_step:
-                            new_bid = Bid(comment_author, comment_bid_amount)
-                            if new_bid.bidder == self.my_facebook_id:
-                                my_valid_bid_count += 1
+                    if not valid_bid_history \
+                            or comment_bid_amount >= valid_bid_history[-1].value + self.auction.min_bid_step:
+                        new_bid = Bid(comment_author, comment_bid_amount)
+                        if new_bid.bidder == self.my_facebook_id:
+                            my_valid_bid_count += 1
 
-                            if self.valid_bid_history and new_bid > self.valid_bid_history[-1]:
-                                print(f'New bid detected!')
-                                self.print_bid(new_bid)
+                        if self.valid_bid_history and new_bid > self.valid_bid_history[-1]:
+                            print(f'New bid detected!')
+                            self.print_bid(new_bid)
 
-                            valid_bid_history.append(new_bid)
-                    except ValueError as err:
-                        pass
+                        valid_bid_history.append(new_bid)
+                except ValueError as err:
+                    pass
                 except NoSuchElementException as err:
                     pass
 

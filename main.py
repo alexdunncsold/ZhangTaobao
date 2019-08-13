@@ -131,9 +131,12 @@ try:
 
 except Exception as err:
     print(err.__repr__())
-    with open('err_dump.html', 'w+') as out:
-        out.write(driver.page_source)
-        out.close()
+    try:
+        with open('err_dump.html', 'wb+') as out:
+            out.write(driver.page_source.encode('utf-8'))
+            out.close()
+    except Exception as err:
+        print(f'Error writing error dump: {err.__repr__()}')
 finally:
     print('Performing final refresh of page and bid history...')
     load_auction_page(driver, auction_context)
@@ -142,9 +145,12 @@ finally:
 
     take_screenshot(driver)
 
-    # with open('final_state_dump.html', 'w+') as out:
-    #     out.write(driver.page_source)
-    #     out.close()
+    try:
+        with open('final_state_dump.html', 'wb+') as out:
+            out.write(driver.page_source.encode('utf-8'))
+            out.close()
+    except Exception as err:
+        print(f'Error writing final-state html: {err.__repr__()}')
 
     print('Final Auction State:')
     auction_context.print_bid_history()

@@ -16,7 +16,7 @@ class AuctionContext:
     valid_bid_history = []
     my_valid_bid_count = 0
     latest_time_notification = None
-    sync_time_at = timedelta(minutes=5)
+    sync_time_at = timedelta(minutes=10)
     posting_delay = None
 
     def __init__(self, credentials, facebook_group, auction,

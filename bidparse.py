@@ -60,10 +60,11 @@ def text_parse(comment_text):
 def comment_parse(comment):
     author = fb.get_comment_author(comment)
     comment_text = fb.get_comment_text(comment)
+    timestamp = fb.get_comment_timestamp(comment)
 
     # distinguish automated bids from manual bids in dev configuration
     if '(autobid)' in comment_text:
         author += '/dev'
 
     bid_value = text_parse(comment_text)
-    return Bid(author, bid_value)
+    return Bid(author, bid_value, timestamp)

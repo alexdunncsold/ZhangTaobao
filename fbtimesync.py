@@ -24,11 +24,11 @@ class FbTimeSync:
     def get_maximal_delay(self):
         return self.maximal_delay if self.maximal_delay else timedelta(seconds=0)
 
-    def init_maximal_delay(self, webdriver):
+    def init_maximal_delay(self, webdriver, trials):
         auction_url = webdriver.current_url
         try:
             self.load_sync_page(webdriver)
-            mean_posting_delay = self.get_mean_posting_delay(webdriver, 10)
+            mean_posting_delay = self.get_mean_posting_delay(webdriver, trials)
             self.maximal_delay = mean_posting_delay + timedelta(milliseconds=500)
             print(
                 f'    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
@@ -88,7 +88,7 @@ class FbTimeSync:
     def get_posting_delay_datum(self, webdriver):
         # If this method is called without being on sync page, load sync page
         if self.group.name not in webdriver.title:
-            webdriver.get(self.url)
+            self.load_sync_page(webdriver)
 
         accuracy_tolerance = 0
         while datetime.now().microsecond > 1000 + accuracy_tolerance:

@@ -90,32 +90,41 @@ def load_auction_page(webdriver, group, post):
 
 
 def get_comments(webdriver):
-    return webdriver.find_elements_by_class_name('_6qw3')
-    # return webdriver.find_elements_by_class_name('_42ef') # change for timestamp
+    comments_container = get_comments_container(webdriver)
+    return comments_container.find_elements_by_class_name('_42ef')
+
+
+def get_comments_container(webdriver):
+    try:
+        return webdriver.find_element_by_class_name('_7791')
+    except NoSuchElementException:
+        raise RuntimeError('get_comments_container(): Failed to find container element ._7791')
 
 
 def get_comment_author(comment):
-    comment_author_elem = comment.find_element_by_class_name('_6qw4')
-    comment_author = comment_author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
-    return comment_author
+    author_elem = comment.find_element_by_class_name('_6qw4')
+    author = author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
+    return author
 
 
 def get_comment_text(comment):
     try:
-        comment_text_elem = comment.find_element_by_class_name('_3l3x')
-        comment_text = comment_text_elem.text
+        text_elem = comment.find_element_by_class_name('_3l3x')
+        text = text_elem.text
     except Exception as err:
-        comment_text = ''
-    return comment_text
+        text = ''
+    return text
 
 
 def get_comment_timestamp(comment):
-    try:
-        comment_timestamp_elem = comment.find_element_by_class_name('livetimestamp')
-        comment_timestamp = comment_timestamp_elem.get_attribute('data-utime')
-    except Exception as err:
-        comment_timestamp = ''
-    return comment_timestamp
+    timestamp_elem = comment.find_element_by_class_name('livetimestamp')
+    timestamp = timestamp_elem.get_attribute('data-utime')
+    timestamp_dt = dt_from(timestamp)
+    return timestamp_dt
+
+
+def dt_from(fb_timestamp):
+    return datetime.utcfromtimestamp(int(fb_timestamp)).replace(tzinfo=utc)
 
 
 def remove_all_child_comments(webdriver):

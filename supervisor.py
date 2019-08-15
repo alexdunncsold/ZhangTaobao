@@ -239,7 +239,7 @@ class Supervisor:
                 print(f'{seconds_remaining} seconds remaining!')
                 self.latest_countdown_proc = seconds_remaining
         elif not self.latest_countdown_proc == 'complete':
-            print('Auction complete!')
+            print('Auction complete!')  # todo find out why this is triggering erroneously
             self.latest_countdown_proc = 'complete'
 
     def auction_expired(self):

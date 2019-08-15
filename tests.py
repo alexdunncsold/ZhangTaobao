@@ -7,27 +7,40 @@ import statistics
 from supervisor import Supervisor
 
 
-class SafetySupervisor(Supervisor):
+class TestSupervisor(Supervisor):
     def __init__(self):
         super().__init__('dev')
 
     def init_selenium(self):
         fb.login_with(self.driver, self.user)
 
-    def test_maximal_delay(self, trials):
-        try:
-            results = []
-            for trial in range(0, trials):
-                self.sync.init_maximal_delay(self.driver)
-                results.append(
-                    math.ceil(self.sync.maximal_delay.seconds * 1000 + self.sync.maximal_delay.microseconds / 1000))
-                self.sync.maximal_delay = None
-                print(f'{results[-1]}ms')
+    def test_maximal_delay(self, trial_sets, trials):
+        max_mean_delta_results = []
 
-            print(f'Delay ave={statistics.mean(results)}ms, min={min(results)}ms, max={max(results)}')
-        except Exception as err:
-            self.driver.quit()
-            raise err
+        for trial_set in range(0, trial_sets):
+            try:
+                delay_results = []
+
+                for trial in range(0, trials):
+                    delay_results.append(self.sync.timedelta_to_ms(self.sync.get_posting_delay_datum(self.driver)))
+                    print(f'{delay_results[-1]}ms')
+
+                delay_mean = statistics.mean(delay_results)
+                delay_min = min(delay_results)
+                delay_max = max(delay_results)
+
+                max_mean_delta = delay_max - delay_mean
+                max_mean_delta_results.append(max_mean_delta)
+
+                print(f'Delay ave={delay_mean}ms, min={delay_min}ms, max={delay_max}')
+            except Exception as err:
+                self.driver.quit()
+                raise err
+
+        delta_mean = statistics.mean(max_mean_delta_results)
+        delta_max = max(max_mean_delta_results)
+
+        print(f'Delta ave={delta_mean}ms, max={delta_max}')
 
     # def run_safety_tests(self, trials_per_test):
     #     results = []
@@ -50,9 +63,9 @@ class SafetySupervisor(Supervisor):
     # return failures
 
 
-def run_tests():
-    supervisor = SafetySupervisor()
-    supervisor.test_maximal_delay(10)
+def test():
+    supervisor = TestSupervisor()
+    supervisor.test_maximal_delay(1, 10)
     supervisor.driver.quit()
 # login_to_facebook(driver, auction_context)
 # posting_delay = get_offset(driver, auction_context)

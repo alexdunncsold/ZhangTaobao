@@ -1,4 +1,7 @@
+from bid import Bid
 from config import SANE_LOWER_BOUND, SANE_UPPER_BOUND
+import facebook as fb
+
 
 def normalise_digits(comment_text):
     normalised_text = ''
@@ -40,7 +43,7 @@ def is_sane_value(candidate_string):
     return SANE_LOWER_BOUND <= bid_amount <= SANE_UPPER_BOUND
 
 
-def parse_bid(comment_text):
+def text_parse(comment_text):
     # returns the first sanely-valued number in a comment
     comment_text = normalise_digits(comment_text)
     bid_value_text = ''
@@ -53,16 +56,15 @@ def parse_bid(comment_text):
             bid_value_text = ''
     raise ValueError('parse_bid(): No sane value could be parsed from comment_text=' + comment_text)
 
-# print(parse_bid('１１１１'))
-# print(parse_bid('1000'))
-# print(parse_bid('二三００'))
-# print(parse_bid('２４００'))
-# print(parse_bid('3〇〇〇'))
-# print(parse_bid('三〇〇〇'))
-# print(parse_bid('2500 and I hate you'))
-# print(parse_bid('10 I hate 2500 and I hate you'))
-# try:
-#     print(parse_bid('th1s h45 50m3 numb3rs but no valid bid'))
-# except ValueError as err:
-#     print(repr(err))
 
+def comment_parse(comment):
+    author = fb.get_comment_author(comment)
+    comment_text = fb.get_comment_text(comment)
+    timestamp = fb.get_comment_timestamp(comment)
+
+    # distinguish automated bids from manual bids in dev configuration
+    if '(autobid)' in comment_text:
+        author += '/dev'
+
+    bid_value = text_parse(comment_text)
+    return Bid(author, bid_value, timestamp)

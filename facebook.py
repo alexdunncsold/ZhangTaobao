@@ -2,6 +2,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
 from datetime import datetime, timedelta
+from pytz import utc
 from time import sleep
 import os
 
@@ -35,46 +36,95 @@ def process_facebook_security_check(webdriver):
     continue_security_process(webdriver)
 
 
-def login_to_facebook(webdriver, auction_context):
-    print("Attempting to load https://www.facebook.com/ ...")
+def login_with(webdriver, user):
+    print("    Attempting to load https://www.facebook.com/ ...")
     webdriver.get("https://www.facebook.com/")
     if 'facebook' in webdriver.title.lower() \
             and 'log in or sign up' in webdriver.title.lower():
-        print("Loaded Facebook login page!")
+        print("    Loaded Facebook login page!")
 
         email_elem = webdriver.find_element_by_id('email')
         email_elem.clear()
-        email_elem.send_keys(auction_context.credentials.email)
+        email_elem.send_keys(user.email)
 
         password_elem = webdriver.find_element_by_id('pass')
         password_elem.clear()
-        password_elem.send_keys(auction_context.credentials.password)
+        password_elem.send_keys(user.password)
 
         print("Logging in...")
         password_elem.send_keys(Keys.RETURN)
 
     elif 'facebook' in webdriver.title.lower():
-        print("Already logged in.")
+        print("    Already logged in.")
     else:
         raise RuntimeError('login_to_facebook(): Failed to load www.facebook.com')
 
     if webdriver.find_elements_by_id('checkpointSubmitButton'):
         process_facebook_security_check(webdriver)
 
-    auction_context.my_facebook_id = \
-    webdriver.find_element_by_class_name('_606w').get_attribute('href').split('https://www.facebook.com/')[1]
-    if auction_context.run_config == 'dev':
-        auction_context.my_facebook_id += '/dev'
+
+def get_facebook_id(webdriver, **kwargs):
+    id = \
+        webdriver.find_element_by_class_name('_606w').get_attribute('href').split('https://www.facebook.com/')[1]
+    if 'dev' in kwargs and kwargs.get('dev') == True:
+        id += '/dev'
+    return id
 
 
-def load_auction_page(webdriver, context):
-    post_permalink = 'https://www.facebook.com/groups/{}/permalink/{}/'.format(context.facebook_group.id, context.auction.id)
-    print('Attempting to load {}'.format(post_permalink))
-    webdriver.get(post_permalink)
-    if context.facebook_group.name in webdriver.title:
-        print("Loaded auction page!")
+def get_auction_name(webdriver):
+    try:
+        item_name = webdriver.find_element_by_class_name('_l53').text
+    except NoSuchElementException:
+        item_name = 'NoNameFound'
+    return item_name
+
+
+def load_auction_page(webdriver, group, post):
+    url = f'https://www.facebook.com/groups/{group.id}/permalink/{post.id}/'
+    print(f'Attempting to load {url}')
+    webdriver.get(url)
+    if group.name in webdriver.title:
+        print('    Loaded auction page!')
     else:
-        raise RuntimeError("load_auction_page(): Failed to load page with title {}".format(context.facebook_group.name))
+        raise RuntimeError(f'load_auction_page(): Failed to load page with title {group.name}')
+
+
+def get_comments(webdriver):
+    comments_container = get_comments_container(webdriver)
+    return comments_container.find_elements_by_class_name('_42ef')
+
+
+def get_comments_container(webdriver):
+    try:
+        return webdriver.find_element_by_class_name('_7791')
+    except NoSuchElementException:
+        raise RuntimeError('get_comments_container(): Failed to find container element ._7791')
+
+
+def get_comment_author(comment):
+    author_elem = comment.find_element_by_class_name('_6qw4')
+    author = author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
+    return author
+
+
+def get_comment_text(comment):
+    try:
+        text_elem = comment.find_element_by_class_name('_3l3x')
+        text = text_elem.text
+    except Exception as err:
+        text = ''
+    return text
+
+
+def get_comment_timestamp(comment):
+    timestamp_elem = comment.find_element_by_class_name('livetimestamp')
+    timestamp = timestamp_elem.get_attribute('data-utime')
+    timestamp_dt = dt_from(timestamp)
+    return timestamp_dt
+
+
+def dt_from(fb_timestamp):
+    return datetime.utcfromtimestamp(int(fb_timestamp)).replace(tzinfo=utc)
 
 
 def remove_all_child_comments(webdriver):
@@ -94,25 +144,20 @@ def post_comment(webdriver, content):
     reply_elem.send_keys(content)
     reply_elem.send_keys(Keys.RETURN)
 
-def make_bid(webdriver, auction_context, bid_amount):
-    print('Preparing to bid {}'.format(bid_amount))
-    if bid_amount > auction_context.max_bid_amount:
-        raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
 
-    bid_content = str(bid_amount) + '(autobid)' if auction_context.run_config == 'dev' else str(bid_amount)
-    print('    Submitting {}'.format(bid_amount))
+def get_last_comment_registered_at(webdriver):
+    # refresh page to ensure that correct timestamp is loaded in DOM
+    webdriver.get(webdriver.current_url)
+    timestamp_element = webdriver.find_elements_by_class_name('livetimestamp')[-1]
+    timestamp_str = timestamp_element.get_attribute('data-utime')
+    post_registered = datetime.utcfromtimestamp(int(timestamp_str)).replace(tzinfo=utc)
 
-    post_comment(webdriver, bid_content)
-
-    auction_context.trigger_extension()
-    sleep(0.05)
-    auction_context.my_active_bid = bid_amount
-    auction_context.bids_placed += 1
+    return post_registered
 
 
 def take_screenshot(webdriver):
     now = datetime.now()
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    BASE_DIR = os.getcwd()
     SCREENSHOTS_FOLDER = os.path.join(BASE_DIR, 'screenshots')
     webdriver.save_screenshot(os.path.join(f'{SCREENSHOTS_FOLDER}{now.timestamp()}.png'))
-    print('Screenshot saved!')
+    print('    Screenshot saved!')

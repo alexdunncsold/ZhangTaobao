@@ -61,7 +61,7 @@ class FbTimeSync:
 
     def get_mean_posting_delay(self, webdriver, trials):
         start_time = datetime.now()
-        abort_threshold = timedelta(minutes=10)  # todo store abort threshold in config in future
+        abort_threshold = timedelta(minutes=3)  # todo store abort threshold in config in future
         delay_results_ms = []
         try:
             for trial in range(0, trials):
@@ -77,8 +77,8 @@ class FbTimeSync:
                 auction_time_remaining = self.sync_threshold - sync_time_elapsed
                 if auction_time_remaining < abort_threshold:
                     raise RuntimeError(
-                        f'Less than {abort_threshold.seconds / 60} minutes left in auction, aborting test after {len(
-                            delay_results_ms)} tests')
+                        f'Less than {abort_threshold.seconds / 60} minutes left in auction, aborting test after ' +
+                        f'{len(delay_results_ms)} tests')
         except RuntimeError as err:
             print(f'    {err.__repr__()}')
 

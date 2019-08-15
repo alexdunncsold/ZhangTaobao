@@ -91,6 +91,7 @@ def load_auction_page(webdriver, group, post):
 
 def get_comments(webdriver):
     return webdriver.find_elements_by_class_name('_6qw3')
+    # return webdriver.find_elements_by_class_name('_42ef') # change for timestamp
 
 
 def get_comment_author(comment):
@@ -106,6 +107,15 @@ def get_comment_text(comment):
     except Exception as err:
         comment_text = ''
     return comment_text
+
+
+def get_comment_timestamp(comment):
+    try:
+        comment_timestamp_elem = comment.find_element_by_class_name('livetimestamp')
+        comment_timestamp = comment_timestamp_elem.get_attribute('data-utime')
+    except Exception as err:
+        comment_timestamp = ''
+    return comment_timestamp
 
 
 def remove_all_child_comments(webdriver):

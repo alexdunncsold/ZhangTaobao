@@ -163,6 +163,11 @@ class Supervisor:
         self.refresh_bid_history(True)
         print('    Refreshed!')
 
+        # if self.auction_won():
+        #     print('Auction won.')
+        # else:
+        #     print('Auction lost.')
+
         fb.take_screenshot(self.driver)
 
         try:
@@ -222,6 +227,10 @@ class Supervisor:
             except ValueError as err:
                 pass
 
+            except NoSuchElementException as err:
+                print(err.__repr__())
+                pass
+
             except Exception as err:
                 print('Exception in get_bid_history_quickly')
                 raise err
@@ -251,6 +260,7 @@ class Supervisor:
         for comment in comment_elem_list:
             try:
                 candidate_bid = bidparse.comment_parse(comment)
+                # candidate_bid.timestamp = fb.get_comment_timestamp(comment)
 
                 if not valid_bid_history \
                         or candidate_bid.value >= valid_bid_history[-1].value + self.constraints.min_bid_step:
@@ -301,3 +311,10 @@ class Supervisor:
         if not self.auction_expired():
             print(
                 f'{self.user.id} has made {self.my_valid_bid_count} valid bids so far ({self.constraints.minimum_bids} required)')
+
+    # def auction_won(self):
+    #     return self.valid_bid_history[-1].bidder == self.user.id \
+    #         and self.dt_from(self.valid_bid_history[-1].timestamp) < self.constraints.expiry
+    #
+    # def dt_from(self, fb_timestamp):
+    #     return datetime.utcfromtimestamp(int(fb_timestamp)).replace(tzinfo=utc)

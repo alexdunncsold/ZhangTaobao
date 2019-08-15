@@ -1,6 +1,7 @@
 class Bid:
     bidder = None
     value = 0
+    timestamp = None
 
     def __init__(self, bidder=None, value=0):
         self.bidder = bidder

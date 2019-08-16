@@ -20,8 +20,9 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
-    latest_countdown_proc = None
-    safety_margin = timedelta(milliseconds=350)
+    countdown_seconds_notifications = [1, 2, 3, 4, 5, 10, 30]
+    countdown_complete = False
+    safety_margin = timedelta(milliseconds=100)
 
     def __init__(self, mode, user_nickname='alex'):
         config = configparser.ConfigParser()
@@ -75,7 +76,12 @@ class Supervisor:
                 out.close()
             raise err
         finally:
-            self.shutdown()
+            try:
+                self.shutdown()
+            finally:
+                print('Quitting webdriver...')
+                self.driver.quit()
+            print('Exited gracefully')
 
     def iterate(self):
         try:
@@ -171,15 +177,6 @@ class Supervisor:
         print('Final Auction State:')
         self.print_bid_history()
 
-        # if self.auction_won():
-        #     print('Auction won.')
-        # else:
-        #     print('Auction lost.')
-
-        print('Quitting webdriver...')
-        self.driver.quit()
-        print('Complete.')
-
     def refresh_bid_history(self, force_accurate=False):
         fb.remove_all_child_comments(self.driver)
         comment_elem_list = fb.get_comments(self.driver)
@@ -220,13 +217,13 @@ class Supervisor:
                 elif candidate_bid.value == valid_bid_history[-1].value:
                     valid_bid_found = True
 
-            except ValueError as err:
+            except ValueError:
                 pass
-
+            except StaleElementReferenceException:
+                pass
             except NoSuchElementException as err:
                 print(err.__repr__())
                 pass
-
             except Exception as err:
                 print('Exception in get_bid_history_quickly')
                 raise err
@@ -237,15 +234,21 @@ class Supervisor:
 
         return valid_bid_history
 
-    def proc_countdown(self):
-        if (not self.auction_expired()) and self.get_time_remaining() < timedelta(seconds=10):
-            seconds_remaining = max(self.get_time_remaining().seconds, 0)
-            if self.latest_countdown_proc is None or seconds_remaining != self.latest_countdown_proc:
-                print(f'{seconds_remaining} seconds remaining!')
-                self.latest_countdown_proc = seconds_remaining
-        elif not self.latest_countdown_proc == 'complete':
-            print('Auction complete!')  # todo find out why this is triggering erroneously
-            self.latest_countdown_proc = 'complete'
+    def proc_countdown(self):  # todo extract to class later
+        try:
+            if self.get_time_remaining() >= timedelta(minutes=1):
+                raise ValueError
+
+            if not self.auction_expired() \
+                    and self.get_time_remaining() < timedelta(seconds=self.countdown_seconds_notifications[-1]):
+                print(f'{str(self.countdown_seconds_notifications.pop()).rjust(10)} seconds remaining!')
+            elif self.auction_expired() and not self.countdown_complete:
+                self.countdown_complete = True
+                print(f'Auction Complete! at {self.get_current_time()} with {self.get_time_remaining()} left')
+        except IndexError as err:
+            pass
+        except ValueError as err:
+            pass
 
     def auction_expired(self):
         return self.get_time_remaining().days == -1
@@ -289,7 +292,6 @@ class Supervisor:
         return self.my_valid_bid_count < self.constraints.minimum_bids
 
     def critical_period_active(self):
-        return True
         return self.get_time_remaining() < timedelta(seconds=45)  # timedelta(seconds=5)
 
     def get_current_time(self):
@@ -323,4 +325,4 @@ class Supervisor:
 
     def auction_won(self):
         return self.valid_bid_history[-1].bidder == self.user.id \
-               and self.dt_from(self.valid_bid_history[-1].timestamp) < self.constraints.expiry
+               and self.valid_bid_history[-1].timestamp < self.constraints.expiry

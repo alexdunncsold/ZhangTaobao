@@ -14,7 +14,7 @@ class ConstraintSet:
             tz = timezone(group_config['dev']['Timezone'])
         elif mode == 'live':
             config.read('live_config.ini')
-            tz = timezone(group_config['DEFAULT']['Timezone'])
+            tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
         else:
             raise ValueError(f'Invalid mode "{mode}" specified')
 
@@ -22,6 +22,8 @@ class ConstraintSet:
             self.expiry = self.get_short_expiry()
         elif config['Constraints']['Expiry'] == 'generateMedium':
             self.expiry = self.get_medium_expiry()
+        elif config['Constraints']['Expiry'] == 'generateLong':
+            self.expiry = self.get_long_expiry()
         else:
             self.expiry = self.parse_auction_datetime(config['Constraints']['Expiry'], tz)
         self.extensions = int(config['Constraints']['Extensions'])
@@ -61,4 +63,10 @@ class ConstraintSet:
     def get_medium_expiry(self):
         t = datetime.utcnow().replace(tzinfo=utc)
         t += timedelta(minutes=5) if t.second < 15 else timedelta(minutes=6)
+        return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
+
+    # Returns an auction expiry in approx. 15min, ending at XX:XX:00.000000
+    def get_long_expiry(self):
+        t = datetime.utcnow().replace(tzinfo=utc)
+        t += timedelta(minutes=15) if t.second < 15 else timedelta(minutes=16)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)

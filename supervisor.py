@@ -102,7 +102,7 @@ class Supervisor:
                 print('time to make initial bid')
                 self.make_bid()
             elif (not self.critical_period_active()) and self.courtesy_bid_due():
-                print('time to make courtesy bid')
+                print('time to make courtesy bid')  # doesn't seem to trigger correctly
                 self.make_bid()
 
         except StaleElementReferenceException as err:
@@ -270,7 +270,8 @@ class Supervisor:
                     if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
                         print(f'New bid detected!')
                         self.print_bid(candidate_bid)
-                        self.schedule_courtesy_bid()
+                        if not self.courtesy_bid_scheduled:
+                            self.schedule_courtesy_bid()
 
                     valid_bid_history.append(candidate_bid)
             except ValueError as err:
@@ -286,13 +287,13 @@ class Supervisor:
         if self.more_bids_required():
             now = self.get_current_time()
             print(f'Scheduling bid for {now}')
-            self.courtesy_bid_scheduled = now if self.mode == 'dev' else (self.constraints.expiry - now) / 2
+            self.courtesy_bid_scheduled = now if self.mode == 'dev' else now + (self.constraints.expiry - now) / 2
 
     def more_bids_required(self):
         return self.my_valid_bid_count < self.constraints.minimum_bids
 
     def critical_period_active(self):
-        return self.get_time_remaining() < timedelta(seconds=45)  # timedelta(seconds=5)
+        return self.get_time_remaining() < timedelta(seconds=5)
 
     def get_current_time(self):
         return datetime.utcnow().replace(tzinfo=utc) + self.sync.get_maximal_delay()

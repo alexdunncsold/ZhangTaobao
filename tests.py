@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import facebook as fb
+import facebookhandler as fb
 import math
 from pytz import utc
 import statistics
@@ -12,7 +12,7 @@ class TestSupervisor(Supervisor):
         super().__init__('dev')
 
     def init_selenium(self):
-        fb.login_with(self.driver, self.user)
+        fb.login_with(self.webdriver, self.user)
 
     def test_maximal_delay(self, trial_sets, trials):
         max_mean_delta_results = []
@@ -22,7 +22,7 @@ class TestSupervisor(Supervisor):
                 delay_results = []
 
                 for trial in range(0, trials):
-                    delay_results.append(self.sync.timedelta_to_ms(self.sync.get_posting_delay_datum(self.driver)))
+                    delay_results.append(self.sync.timedelta_to_ms(self.sync.get_posting_delay_datum(self.webdriver)))
                     print(f'{delay_results[-1]}ms')
 
                 delay_mean = statistics.mean(delay_results)
@@ -34,7 +34,7 @@ class TestSupervisor(Supervisor):
 
                 print(f'Delay ave={delay_mean}ms, min={delay_min}ms, max={delay_max}')
             except Exception as err:
-                self.driver.quit()
+                self.webdriver.quit()
                 raise err
 
         delta_mean = statistics.mean(max_mean_delta_results)
@@ -66,7 +66,7 @@ class TestSupervisor(Supervisor):
 def test():
     supervisor = TestSupervisor()
     supervisor.test_maximal_delay(1, 10)
-    supervisor.driver.quit()
+    supervisor.webdriver.quit()
 # login_to_facebook(driver, auction_context)
 # posting_delay = get_offset(driver, auction_context)
 # load_auction_page(driver, auction_context)

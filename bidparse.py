@@ -1,6 +1,6 @@
 from bid import Bid
 from config import SANE_LOWER_BOUND, SANE_UPPER_BOUND
-import facebook as fb
+from facebookhandler import FacebookHandler as fb
 
 
 def normalise_digits(comment_text):

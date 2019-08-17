@@ -1,16 +1,19 @@
-from bid import Bid
-import bidparse
 import configparser
-import facebook as fb
-from datetime import datetime, timedelta
 from time import sleep
 from pytz import utc
+from datetime import datetime, timedelta
+
+from archiver import Archiver
+from bid import Bid
+
+import bidparse
 
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
 from auctionpost import AuctionPost
 from constraintset import ConstraintSet
-from fbgroup import FbGroup
+from facebookgroup import FbGroup
+from facebookhandler import FacebookHandler
 from fbtimesync import FbTimeSync
 from user import User
 from webdriver import get_webdriver
@@ -39,31 +42,35 @@ class Supervisor:
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
         self.constraints = ConstraintSet(mode)
         self.extensions_remaining = self.constraints.extensions
-        self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
-        self.sync = FbTimeSync()
         self.user = User(user_nickname)
 
-        self.driver = get_webdriver(self.user.id)
+        self.webdriver = get_webdriver(self.user.id)
+        self.archiver = Archiver(self.webdriver)
+        self.fb = FacebookHandler(self.webdriver)
+        self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
+        self.sync = FbTimeSync(self.fb)
+
         try:
             self.init_selenium()
         except Exception as err:
             print(f'Encountered exception in supervisor init:{err.__repr__()}')
-            self.driver.quit()
+            self.webdriver.quit()
             raise err
 
     def init_selenium(self):
-        fb.login_with(self.driver, self.user)
-        self.user.id = fb.get_facebook_id(self.driver, dev=(self.mode == 'dev'))
-        fb.load_auction_page(self.driver, self.fbgroup, self.auctionpost)
-        self.auctionpost.name = fb.get_auction_name(self.driver)
+        self.fb.login_with(self.user)
+        self.user.id = self.fb.get_facebook_id(dev=(self.mode == 'dev'))
+        self.fb.load_auction_page(self.fbgroup, self.auctionpost)
+        self.auctionpost.name = self.fb.get_auction_name()
         self.print_preamble()
         self.refresh_bid_history(True)
         self.print_bid_history()
 
     def print_preamble(self):
         print(
-            f"Bidding as {self.user.id} on {self.auctionpost.name} to a maximum of {self.constraints.max_bid} in steps of {self.constraints.min_bid_step}")
-        print(f'    Auction ends {self.constraints.expiry.astimezone(self.user.tz)}')
+            f'Bidding as {self.user.id} on {self.auctionpost.name} to a maximum of {self.constraints.max_bid} '
+            f'in steps of {self.constraints.min_bid_step}')
+        print(f'    Auction ends {self.constraints.expiry.astimezone(self.user.tz)} user-locale time')
 
     def perform_main_loop(self):
         try:
@@ -71,22 +78,20 @@ class Supervisor:
                 self.iterate()
         except Exception as err:
             print(f'Error in perform_main_loop(): {err.__repr__()}')
-            with open('err_dump.html', 'wb+') as out:
-                out.write(self.driver.page_source.encode('utf-8'))
-                out.close()
+            self.archiver.save_error_dump_html()
             raise err
         finally:
             try:
                 self.shutdown()
             finally:
                 print('Quitting webdriver...')
-                self.driver.quit()
+                self.webdriver.quit()
             print('Exited gracefully')
 
     def iterate(self):
         try:
             if self.sync_required():
-                self.sync.init_maximal_delay(self.driver, 10 if self.mode != 'dev' else 3)
+                self.sync.init_maximal_delay(10 if self.mode != 'dev' else 3)
 
             self.refresh_bid_history()
             self.proc_countdown()
@@ -115,7 +120,7 @@ class Supervisor:
     def winning(self):
         try:
             return self.valid_bid_history[-1].bidder == self.user.id
-        except IndexError as err:
+        except IndexError:
             return False
 
     def can_bid(self):
@@ -125,7 +130,7 @@ class Supervisor:
         try:
             return max(self.constraints.starting_bid,
                        self.valid_bid_history[-1].value + self.constraints.min_bid_step)
-        except IndexError as err:
+        except IndexError:
             return self.constraints.starting_bid
 
     def time_to_snipe(self):
@@ -138,7 +143,7 @@ class Supervisor:
             raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
         comment_content = f'{bid_value}(autobid)' if self.mode == 'dev' else str(bid_value)
         print(f'Submitting "{comment_content}"')
-        fb.post_comment(self.driver, comment_content)
+        self.fb.post_comment(comment_content)
 
         self.trigger_extension()
         self.courtesy_bid_scheduled = None
@@ -161,25 +166,20 @@ class Supervisor:
 
     def shutdown(self):
         print('Performing final refresh of page and bid history...')
-        fb.load_auction_page(self.driver, self.fbgroup, self.auctionpost)
+        self.fb.load_auction_page(self.fbgroup, self.auctionpost)
         self.refresh_bid_history(True)
         print('    Refreshed!')
 
-        fb.take_screenshot(self.driver)
+        self.archiver.take_screenshot()
 
-        try:
-            with open('final_state_dump.html', 'wb+') as out:
-                out.write(self.driver.page_source.encode('utf-8'))
-                out.close()
-        except Exception as err:
-            print(f'Error writing final-state html: {err.__repr__()}')
+        self.archiver.save_final_state_html()
 
         print('Final Auction State:')
         self.print_bid_history()
 
     def refresh_bid_history(self, force_accurate=False):
-        fb.remove_all_child_comments(self.driver)
-        comment_elem_list = fb.get_comments(self.driver)
+        self.fb.remove_all_child_comments()
+        comment_elem_list = self.fb.get_comments()
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
@@ -245,9 +245,9 @@ class Supervisor:
             elif self.auction_expired() and not self.countdown_complete:
                 self.countdown_complete = True
                 print(f'Auction Complete! at {self.get_current_time()} with {self.get_time_remaining()} left')
-        except IndexError as err:
+        except IndexError:
             pass
-        except ValueError as err:
+        except ValueError:
             pass
 
     def auction_expired(self):
@@ -274,11 +274,11 @@ class Supervisor:
                             self.schedule_courtesy_bid()
 
                     valid_bid_history.append(candidate_bid)
-            except ValueError as err:
+            except ValueError:
                 pass
-            except NoSuchElementException as err:
+            except NoSuchElementException:
                 pass
-            except Exception as err:
+            except Exception:
                 pass
 
         return valid_bid_history

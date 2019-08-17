@@ -9,9 +9,9 @@ def get_webdriver(user_id):
     options = Options()
     if platform == 'win32':
         options.add_argument('--disable-notifications')
-        # options.add_argument('--disable-gpu')
-        # options.add_argument('--headless')
-        # options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--headless')
+        options.add_argument('--remote-debugging-port=9222')
         options.add_argument(f'--user-data-dir={os.path.join(os.getcwd(), "user_profiles", user_id, "chrome-data")}')
     elif platform == 'linux':
         options = Options()

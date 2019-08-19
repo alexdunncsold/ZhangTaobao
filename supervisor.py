@@ -24,8 +24,6 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
-    # countdown_seconds_notifications = [1, 2, 3, 4, 5, 10, 30]
-    # countdown_complete = False
     safety_margin = timedelta(milliseconds=100)
 
     def __init__(self, mode, user_nickname='alex'):
@@ -50,7 +48,7 @@ class Supervisor:
         self.archiver = Archiver(self.webdriver)
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
-        self.sync = FbTimeSync(self.fb)
+        self.sync = FbTimeSync(self.fb, self.constraints, (self.mode == 'dev'))
 
         try:
             self.init_selenium()
@@ -76,7 +74,7 @@ class Supervisor:
 
     def perform_main_loop(self):
         try:
-            while not self.auction_expired():
+            while not self.sync.auction_expired():
                 self.iterate()
         except Exception as err:
             print(f'Error in perform_main_loop(): {err.__repr__()}')
@@ -92,9 +90,7 @@ class Supervisor:
 
     def iterate(self):
         try:
-            if self.sync_required():
-                self.sync.init_maximal_delay(10 if self.mode != 'dev' else 3)
-
+            self.sync.sync_if_required()
             self.refresh_bid_history()
             self.countdown.proc()
 
@@ -115,10 +111,6 @@ class Supervisor:
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
 
-    def sync_required(self):
-        system_time = datetime.utcnow().replace(tzinfo=utc)
-        return self.constraints.expiry - system_time < self.sync.sync_threshold and not self.sync.maximal_delay
-
     def winning(self):
         try:
             return self.valid_bid_history[-1].bidder == self.user.id
@@ -136,7 +128,7 @@ class Supervisor:
             return self.constraints.starting_bid
 
     def time_to_snipe(self):
-        return self.get_current_time() > self.constraints.expiry - self.safety_margin
+        return self.sync.get_current_time() > self.constraints.expiry - self.safety_margin
 
     def make_bid(self):
         bid_value = self.get_lowest_valid_bid_value()
@@ -154,7 +146,7 @@ class Supervisor:
 
     def trigger_extension(self):
         if self.extensions_remaining > 0 \
-                and self.get_time_remaining() < timedelta(minutes=5):
+                and self.sync.get_time_remaining() < timedelta(minutes=5):
             self.constraints.expiry += timedelta(minutes=(1 if self.mode == 'dev' else 5))
             self.extensions_remaining -= 1
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
@@ -163,8 +155,9 @@ class Supervisor:
         return self.my_valid_bid_count < 1 and self.constraints.make_initial_bid
 
     def courtesy_bid_due(self):
-        return False if not self.courtesy_bid_scheduled else self.my_valid_bid_count < self.constraints.minimum_bids \
-                                                             and self.get_current_time() > self.courtesy_bid_scheduled
+        return False if not self.courtesy_bid_scheduled \
+            else (self.my_valid_bid_count < self.constraints.minimum_bids
+                  and self.sync.get_current_time() > self.courtesy_bid_scheduled)
 
     def shutdown(self):
         print('Performing final refresh of page and bid history...')
@@ -173,7 +166,6 @@ class Supervisor:
         print('    Refreshed!')
 
         self.archiver.take_screenshot()
-
         self.archiver.save_final_state_html()
 
         print('Final Auction State:')
@@ -236,25 +228,6 @@ class Supervisor:
 
         return valid_bid_history
 
-    # def proc_countdown(self):  # todo extract to class later
-    #     try:
-    #         if self.get_time_remaining() >= timedelta(minutes=1):
-    #             raise ValueError
-    #
-    #         if not self.auction_expired() \
-    #                 and self.get_time_remaining() < timedelta(seconds=self.countdown_seconds_notifications[-1]):
-    #             print(f'{str(self.countdown_seconds_notifications.pop()).rjust(10)} seconds remaining!')
-    #         elif self.auction_expired() and not self.countdown_complete:
-    #             self.countdown_complete = True
-    #             print(f'Auction Complete! at {self.get_current_time()} with {self.get_time_remaining()} left')
-    #     except IndexError:
-    #         pass
-    #     except ValueError:
-    #         pass
-
-    def auction_expired(self):
-        return self.get_time_remaining().days == -1
-
     def get_bid_history_accurately(self, comment_elem_list):
         valid_bid_history = []
 
@@ -287,7 +260,7 @@ class Supervisor:
 
     def schedule_courtesy_bid(self):
         if self.more_bids_required():
-            now = self.get_current_time()
+            now = self.sync.get_current_time()
             print(f'Scheduling bid for {now}')
             self.courtesy_bid_scheduled = now if self.mode == 'dev' else now + (self.constraints.expiry - now) / 2
 
@@ -295,14 +268,7 @@ class Supervisor:
         return self.my_valid_bid_count < self.constraints.minimum_bids
 
     def critical_period_active(self):
-        return self.get_time_remaining() < timedelta(seconds=5)
-
-    def get_current_time(self):
-        return datetime.utcnow().replace(tzinfo=utc) + self.sync.get_maximal_delay()
-
-    def get_time_remaining(self):
-        time_remaining = self.constraints.expiry - self.get_current_time()
-        return time_remaining
+        return self.sync.get_time_remaining() < timedelta(seconds=5)
 
     def print_bid(self, bid):
         max_placed_bid_digits = len(str(self.valid_bid_history[-1].value))
@@ -314,7 +280,7 @@ class Supervisor:
         print('Current Bid History:')
         for bid in self.valid_bid_history:
             self.print_bid(bid)
-        if self.auction_expired():
+        if self.sync.auction_expired():
             self.print_auction_result()
         else:
             print(f'{self.user.id} has made {self.my_valid_bid_count} valid bids so far '

@@ -12,6 +12,7 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 
 from auctionpost import AuctionPost
 from constraintset import ConstraintSet
+from countdowntimer import CountdownTimer
 from facebookgroup import FbGroup
 from facebookhandler import FacebookHandler
 from fbtimesync import FbTimeSync
@@ -23,8 +24,8 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
-    countdown_seconds_notifications = [1, 2, 3, 4, 5, 10, 30]
-    countdown_complete = False
+    # countdown_seconds_notifications = [1, 2, 3, 4, 5, 10, 30]
+    # countdown_complete = False
     safety_margin = timedelta(milliseconds=100)
 
     def __init__(self, mode, user_nickname='alex'):
@@ -40,6 +41,7 @@ class Supervisor:
             raise ValueError(f'Invalid mode "{mode}" specified')
 
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
+        self.countdown = CountdownTimer(self)
         self.constraints = ConstraintSet(mode)
         self.extensions_remaining = self.constraints.extensions
         self.user = User(user_nickname)
@@ -94,7 +96,7 @@ class Supervisor:
                 self.sync.init_maximal_delay(10 if self.mode != 'dev' else 3)
 
             self.refresh_bid_history()
-            self.proc_countdown()
+            self.countdown.proc()
 
             if self.winning():
                 pass
@@ -234,21 +236,21 @@ class Supervisor:
 
         return valid_bid_history
 
-    def proc_countdown(self):  # todo extract to class later
-        try:
-            if self.get_time_remaining() >= timedelta(minutes=1):
-                raise ValueError
-
-            if not self.auction_expired() \
-                    and self.get_time_remaining() < timedelta(seconds=self.countdown_seconds_notifications[-1]):
-                print(f'{str(self.countdown_seconds_notifications.pop()).rjust(10)} seconds remaining!')
-            elif self.auction_expired() and not self.countdown_complete:
-                self.countdown_complete = True
-                print(f'Auction Complete! at {self.get_current_time()} with {self.get_time_remaining()} left')
-        except IndexError:
-            pass
-        except ValueError:
-            pass
+    # def proc_countdown(self):  # todo extract to class later
+    #     try:
+    #         if self.get_time_remaining() >= timedelta(minutes=1):
+    #             raise ValueError
+    #
+    #         if not self.auction_expired() \
+    #                 and self.get_time_remaining() < timedelta(seconds=self.countdown_seconds_notifications[-1]):
+    #             print(f'{str(self.countdown_seconds_notifications.pop()).rjust(10)} seconds remaining!')
+    #         elif self.auction_expired() and not self.countdown_complete:
+    #             self.countdown_complete = True
+    #             print(f'Auction Complete! at {self.get_current_time()} with {self.get_time_remaining()} left')
+    #     except IndexError:
+    #         pass
+    #     except ValueError:
+    #         pass
 
     def auction_expired(self):
         return self.get_time_remaining().days == -1

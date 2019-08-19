@@ -10,10 +10,12 @@ import math
 import statistics
 
 
-class FbTimeSync:
+class FacebookAuctionClock:
 
-    def __init__(self, fb):
+    def __init__(self, fb, constraints, dev_mode=False):
         self.fb = fb
+        self.constraints = constraints
+        self.dev_mode = dev_mode
 
         config = configparser.ConfigParser()
         config.read('sync_config.ini')
@@ -22,6 +24,24 @@ class FbTimeSync:
         self.group = FbGroup('sync')
         self.url = f"https://www.facebook.com/groups/{self.group.id}/permalink/{config['post']['Id']}/"
         self.sync_threshold = timedelta(minutes=int(config['settings']['SyncThresholdMinutes']))
+
+    def sync_if_required(self):
+        if self.sync_required():
+            self.init_maximal_delay(3 if self.dev_mode else 10)
+
+    def sync_required(self):
+        system_time = datetime.utcnow().replace(tzinfo=utc)
+        return self.constraints.expiry - system_time < self.sync_threshold and not self.maximal_delay
+
+    def auction_expired(self):
+        return self.get_time_remaining().days == -1
+
+    def get_time_remaining(self):
+        time_remaining = self.constraints.expiry - self.get_current_time()
+        return time_remaining
+
+    def get_current_time(self):
+        return datetime.utcnow().replace(tzinfo=utc) + self.get_maximal_delay()
 
     def get_maximal_delay(self):
         return self.maximal_delay if self.maximal_delay else timedelta(seconds=0)
@@ -33,11 +53,11 @@ class FbTimeSync:
             mean_posting_delay = self.get_mean_posting_delay(trials)
             self.maximal_delay = mean_posting_delay + timedelta(milliseconds=500)
             print(
-                f'    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
+                f'\n    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
 
         except RuntimeError:
             self.maximal_delay = timedelta(seconds=5)
-            print(f'    Error when determining posting delay')
+            print(f'\n    Error when determining posting delay')
 
         print(
             f'    Maximal delay set to {self.timedelta_to_ms(self.maximal_delay)}ms')
@@ -50,7 +70,7 @@ class FbTimeSync:
         print('    Attempting to load sync page')
         self.fb.webdriver.get(self.url)
         if self.group.name in self.fb.webdriver.title:
-            print("    Loaded sync page!  Please be patient...")
+            print("    Loaded sync page!  Please be patient", end='')
         else:
             raise RuntimeError(
                 "load_auction_page(): Failed to load sync page")
@@ -98,6 +118,7 @@ class FbTimeSync:
             # Do nothing - we want to sync as close to on-the-second as possible
             accuracy_tolerance += 100
 
+        print('.', end='')
         post_attempted = datetime.utcnow().replace(tzinfo=utc)
         self.fb.post_comment('    Syncing...')
         self.fb.webdriver.get(self.url)

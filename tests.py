@@ -22,7 +22,7 @@ class TestSupervisor(Supervisor):
                 delay_results = []
 
                 for trial in range(0, trials):
-                    delay_results.append(self.sync.timedelta_to_ms(self.sync.get_posting_delay_datum(self.webdriver)))
+                    delay_results.append(self.fbclock.timedelta_to_ms(self.fbclock.get_posting_delay_datum(self.webdriver)))
                     print(f'{delay_results[-1]}ms')
 
                 delay_mean = statistics.mean(delay_results)

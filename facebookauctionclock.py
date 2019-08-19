@@ -10,7 +10,7 @@ import math
 import statistics
 
 
-class FbTimeSync:
+class FacebookAuctionClock:
 
     def __init__(self, fb, constraints, dev_mode=False):
         self.fb = fb

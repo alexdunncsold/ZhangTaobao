@@ -39,7 +39,6 @@ class Supervisor:
             raise ValueError(f'Invalid mode "{mode}" specified')
 
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
-        self.countdown = CountdownTimer(self)
         self.constraints = ConstraintSet(mode)
         self.extensions_remaining = self.constraints.extensions
         self.user = User(user_nickname)
@@ -49,6 +48,7 @@ class Supervisor:
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
         self.fbclock = FacebookAuctionClock(self.fb, self.constraints, (self.mode == 'dev'))
+        self.countdown = CountdownTimer(self.fbclock)
 
         try:
             self.init_selenium()
@@ -148,6 +148,7 @@ class Supervisor:
         if self.extensions_remaining > 0 \
                 and self.fbclock.get_time_remaining() < timedelta(minutes=5):
             self.constraints.expiry += timedelta(minutes=(1 if self.mode == 'dev' else 5))
+            self.countdown.reset()
             self.extensions_remaining -= 1
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
 
@@ -177,6 +178,7 @@ class Supervisor:
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
+            print('critical')
             valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
         # Else if operating in non-critical mode
         else:

@@ -27,7 +27,7 @@ class FacebookAuctionClock:
 
     def sync_if_required(self):
         if self.sync_required():
-            self.init_maximal_delay(10 if self.dev_mode else 3)
+            self.init_maximal_delay(3 if self.dev_mode else 10)
 
     def sync_required(self):
         system_time = datetime.utcnow().replace(tzinfo=utc)
@@ -53,11 +53,11 @@ class FacebookAuctionClock:
             mean_posting_delay = self.get_mean_posting_delay(trials)
             self.maximal_delay = mean_posting_delay + timedelta(milliseconds=500)
             print(
-                f'    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
+                f'\n    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
 
         except RuntimeError:
             self.maximal_delay = timedelta(seconds=5)
-            print(f'    Error when determining posting delay')
+            print(f'\n    Error when determining posting delay')
 
         print(
             f'    Maximal delay set to {self.timedelta_to_ms(self.maximal_delay)}ms')
@@ -70,7 +70,7 @@ class FacebookAuctionClock:
         print('    Attempting to load sync page')
         self.fb.webdriver.get(self.url)
         if self.group.name in self.fb.webdriver.title:
-            print("    Loaded sync page!  Please be patient...")
+            print("    Loaded sync page!  Please be patient", end='')
         else:
             raise RuntimeError(
                 "load_auction_page(): Failed to load sync page")
@@ -118,6 +118,7 @@ class FacebookAuctionClock:
             # Do nothing - we want to sync as close to on-the-second as possible
             accuracy_tolerance += 100
 
+        print('.', end='')
         post_attempted = datetime.utcnow().replace(tzinfo=utc)
         self.fb.post_comment('    Syncing...')
         self.fb.webdriver.get(self.url)

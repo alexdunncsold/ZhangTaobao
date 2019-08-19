@@ -76,7 +76,7 @@ class Supervisor:
 
     def perform_main_loop(self):
         try:
-            while self.get_current_time() < self.constraints.expiry:
+            while not self.auction_expired():
                 self.iterate()
         except Exception as err:
             print(f'Error in perform_main_loop(): {err.__repr__()}')

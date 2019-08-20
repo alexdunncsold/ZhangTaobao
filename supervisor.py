@@ -26,20 +26,18 @@ class Supervisor:
     courtesy_bid_scheduled = None
     safety_margin = timedelta(milliseconds=100)
 
-    def __init__(self, mode, user_nickname='alex'):
+    def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
 
-        if mode == 'dev' or mode == 'test':
-            self.mode = 'dev'
+        if 'dev' in kwargs and kwargs['dev']:
+            self.dev_mode = True
             config.read('test_config.ini')
-        elif mode == 'live':
-            self.mode = 'live'
-            config.read('live_config.ini')
         else:
-            raise ValueError(f'Invalid mode "{mode}" specified')
+            self.dev_mode = False
+            config.read('live_config.ini')
 
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
-        self.constraints = ConstraintSet(mode)
+        self.constraints = ConstraintSet(self.dev_mode)
         self.extensions_remaining = self.constraints.extensions
         self.user = User(user_nickname)
 
@@ -47,7 +45,7 @@ class Supervisor:
         self.archiver = Archiver(self.webdriver)
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
-        self.fbclock = FacebookAuctionClock(self.fb, self.constraints, (self.mode == 'dev'))
+        self.fbclock = FacebookAuctionClock(self.fb, self.constraints, self.dev_mode)
         self.countdown = CountdownTimer(self.fbclock)
 
         try:
@@ -59,7 +57,7 @@ class Supervisor:
 
     def init_selenium(self):
         self.fb.login_with(self.user)
-        self.user.id = self.fb.get_facebook_id(dev=(self.mode == 'dev'))
+        self.user.id = self.fb.get_facebook_id(dev=self.dev_mode)
         self.fb.load_auction_page(self.fbgroup, self.auctionpost)
         self.auctionpost.name = self.fb.get_auction_name()
         self.print_preamble()
@@ -135,7 +133,7 @@ class Supervisor:
         print(f'Preparing to bid {bid_value}')
         if bid_value > self.constraints.max_bid:
             raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
-        comment_content = f'{bid_value}(autobid)' if self.mode == 'dev' else str(bid_value)
+        comment_content = f'{bid_value}(autobid)' if self.dev_mode else str(bid_value)
         print(f'Submitting "{comment_content}"')
         self.fb.post_comment(comment_content)
 
@@ -147,7 +145,7 @@ class Supervisor:
     def trigger_extension(self):
         if self.extensions_remaining > 0 \
                 and self.fbclock.get_time_remaining() < timedelta(minutes=5):
-            self.constraints.expiry += timedelta(minutes=(1 if self.mode == 'dev' else 5))
+            self.constraints.expiry += timedelta(minutes=(1 if self.dev_mode else 5))
             self.countdown.reset()
             self.extensions_remaining -= 1
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
@@ -264,7 +262,7 @@ class Supervisor:
         if self.more_bids_required():
             now = self.fbclock.get_current_time()
             print(f'Scheduling bid for {now}')
-            self.courtesy_bid_scheduled = now if self.mode == 'dev' else now + (self.constraints.expiry - now) / 2
+            self.courtesy_bid_scheduled = now if self.dev_mode else now + (self.constraints.expiry - now) / 2
 
     def more_bids_required(self):
         return self.my_valid_bid_count < self.constraints.minimum_bids

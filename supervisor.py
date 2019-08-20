@@ -176,7 +176,6 @@ class Supervisor:
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
-            print('critical')
             valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
         # Else if operating in non-critical mode
         else:

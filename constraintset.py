@@ -4,19 +4,17 @@ from pytz import utc, timezone
 
 
 class ConstraintSet:
-    def __init__(self, mode):
+    def __init__(self, dev_mode=False):
         config = configparser.ConfigParser()
         group_config = configparser.ConfigParser()
         group_config.read('group_config.ini')
 
-        if mode == 'dev' or mode == 'test':
+        if dev_mode:
             config.read('test_config.ini')
             tz = timezone(group_config['dev']['Timezone'])
-        elif mode == 'live':
+        else:
             config.read('live_config.ini')
             tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
-        else:
-            raise ValueError(f'Invalid mode "{mode}" specified')
 
         if config['Constraints']['Expiry'] == 'generateShort':
             self.expiry = self.get_short_expiry()

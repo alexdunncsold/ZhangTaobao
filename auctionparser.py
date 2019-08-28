@@ -158,7 +158,7 @@ def parse_expiry(text):
 
 def parse_bid_step(text):
     try:
-    # bid_step = re.search('(?<=每步)\+?\d*', text)[0].replace('+','')
+        bid_step = re.search('(?<=每步)\+?\d*', text)[0].replace('+','')
     except:
         return 'could not parse'
 
@@ -166,16 +166,20 @@ def parse_bid_step(text):
 
 
 def parse_minimum_bid(text):
-    pass
+    try:
+        minimum_bid = re.search('(?<=起標)\d*(?=元)', text)[0].replace('+', '')
+    except:
+        return 'could not parse'
+
+    return int(minimum_bid)
 
 
-# print(f'prodder:{parse_producer(test_post_text)} '
-#       f'prod:{parse_production(test_post_text)} '
-#       f'year:{parse_production_year(test_post_text)} '
-#       f'weight:{parse_weight(test_post_text)}g '
-#       f'type:{parse_tea_type(test_post_text)} '
-#       f'storage:{parse_storage_type(test_post_text)}')
-
-#
-# print(parse_expiry(test_post_text))
-print(parse_bid_step(test_post_text))
+print(f'prodder:{parse_producer(test_post_text)}\n'
+      f'prod:{parse_production(test_post_text)}\n'
+      f'year:{parse_production_year(test_post_text)}\n'
+      f'weight:{parse_weight(test_post_text)}g\n'
+      f'type:{parse_tea_type(test_post_text)}\n'
+      f'storage:{parse_storage_type(test_post_text)}\n'
+      f'expiry: {parse_expiry(test_post_text)}\n'
+      f'min bid: {parse_minimum_bid(test_post_text)}\n'
+      f'bid step: {parse_bid_step(test_post_text)}')

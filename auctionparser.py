@@ -24,78 +24,62 @@ test_post_text = '''
 誠實賣家每筆交易均開立發票，保證正品，如賣仿冒品願意無條件退貨，同時負擔所有運費。
 '''
 
+#separation characters
+seps = ' ：: —】'
+
+
+def strip_separators(text):
+    for c in seps:
+        text = text.replace(c, '')
+    return text
 
 def parse_seller(text):
     pass
 
 
-def get_auction_property(property, text):
-    match = re.search(f'(?<={property}[：:]).*', text)
-
-    if not match:
-        match = re.search('(?<=茶廠).*', text)
-
-    if not match:
-        raise ValueError()
-
-    return match
-
-
 def parse_producer(text):
     try:
-        producer = get_auction_property('茶廠', text)
+        producer = strip_separators(re.search(f'(?<=茶廠)[{seps}]*.*', text)[0])
     except:
         return 'unable to parse'
 
-    return producer[0]
+    return producer
 
 
 def parse_production(text):
     try:
-        production = get_auction_property('品名', text)
-    except ValueError:
+        production = strip_separators(re.search(f'(?<=品名)[{seps}]*.*', text)[0])
+    except:
         return 'unable to parse'
 
-    return production[0]
+    return production
 
 
 def parse_production_year(text):
     try:
-        production_year = re.search('(?<=年份[：:])\d\d\d\d', text)
-
-        if not production_year:
-            production_year = re.search('(?<=年份)\d\d\d\d', text)
-
-        if not production_year:
-            raise ValueError()
-    except ValueError:
+        production_year = strip_separators(re.search(f'(?<=年份)[{seps}]*\d\d\d\d', text)[0])
+    except:
         return 'unable to parse'
 
-    return production_year[0]
+    return production_year
 
 
 def parse_weight(text):
     try:
-        production_year = re.search('(?<=規格[：:])\d*(?=克)', text)
-
-        if not production_year:
-            production_year = re.search('(?<=規格)\d*(?=克)', text)
-
-        if not production_year:
-            raise ValueError()
-    except ValueError:
+        production_year = strip_separators(re.search(f'(?<=規格)[{seps}]*\d*(?=克)', text)[0])
+    except:
         return 'unable to parse'
 
-    return production_year[0]
+    return production_year
 
 
 def parse_tea_type(text):
     try:
-        producer = get_auction_property('生熟', text)
+        tea_type = strip_separators(re.search(f'(?<=生熟).*', text)[0])
     except ValueError:
         return 'unable to parse'
 
-    if producer[0] == '生茶':
+    if tea_type == '生茶':
         return 'sheng'
     else:
         return 'shou/other'

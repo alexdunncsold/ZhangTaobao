@@ -25,7 +25,6 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
-    safety_margin = timedelta(0)  # timedelta(milliseconds=100-500)  #todo get rid if not needed
 
     def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
@@ -165,7 +164,7 @@ class Supervisor:
             return self.constraints.starting_bid
 
     def time_to_snipe(self):
-        return self.fbclock.get_current_time() > self.constraints.expiry - self.safety_margin
+        return self.fbclock.get_current_time() > self.constraints.expiry
 
     def make_bid(self):
         bid_value = self.get_lowest_valid_bid_value()

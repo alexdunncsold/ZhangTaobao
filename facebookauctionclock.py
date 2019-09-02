@@ -126,7 +126,7 @@ class FacebookAuctionClock:
         accuracy_tolerance = 0
         while datetime.now().microsecond > 1000 + accuracy_tolerance:
             # Do nothing - we want to sync as close to on-the-second as possible
-            accuracy_tolerance += 100
+            accuracy_tolerance += 25
 
         print('.', end='')
         post_attempted = datetime.utcnow().replace(tzinfo=utc)

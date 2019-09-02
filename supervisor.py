@@ -129,7 +129,12 @@ class Supervisor:
                 pass
             elif self.time_to_snipe():
                 print('time to snipe')
-                self.make_bid()
+                if self.constraints.max_bid >= self.get_lowest_valid_bid_value(2) + 8:
+                    self.make_bid(2, 8)
+                elif self.constraints.max_bid >= self.get_lowest_valid_bid_value(2):
+                    self.make_bid(2)
+                else:
+                    self.make_bid()
             elif self.initial_bid_due():
                 print('time to make initial bid')
                 self.make_bid()
@@ -156,18 +161,18 @@ class Supervisor:
     def can_bid(self):
         return self.get_lowest_valid_bid_value() <= self.constraints.max_bid
 
-    def get_lowest_valid_bid_value(self):
+    def get_lowest_valid_bid_value(self, steps=1):
         try:
             return max(self.constraints.starting_bid,
-                       self.valid_bid_history[-1].value + self.constraints.min_bid_step)
+                       self.valid_bid_history[-1].value + self.constraints.min_bid_step * steps)
         except IndexError:
             return self.constraints.starting_bid
 
     def time_to_snipe(self):
         return self.fbclock.get_current_time() > self.constraints.expiry
 
-    def make_bid(self):
-        bid_value = self.get_lowest_valid_bid_value()
+    def make_bid(self, steps=1, extra=0):
+        bid_value = self.get_lowest_valid_bid_value(steps) + extra
         if bid_value != self.most_recent_bid_submission:
             print(f'Preparing to bid {bid_value}')
             if bid_value > self.constraints.max_bid:

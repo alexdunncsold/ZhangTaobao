@@ -60,11 +60,11 @@ class ConstraintSet:
     # Returns an auction expiry in approx. 5min, ending at XX:XX:00.000000
     def get_medium_expiry(self):
         t = datetime.utcnow().replace(tzinfo=utc)
-        t += timedelta(minutes=5) if t.second < 15 else timedelta(minutes=6)
+        t += timedelta(minutes=2) if t.second < 15 else timedelta(minutes=3)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
     # Returns an auction expiry in approx. 15min, ending at XX:XX:00.000000
     def get_long_expiry(self):
         t = datetime.utcnow().replace(tzinfo=utc)
-        t += timedelta(minutes=15) if t.second < 15 else timedelta(minutes=16)
+        t += timedelta(minutes=5) if t.second < 15 else timedelta(minutes=6)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)

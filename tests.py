@@ -8,11 +8,8 @@ from supervisor import Supervisor
 
 
 class TestSupervisor(Supervisor):
-    def __init__(self):
-        super().__init__('dev')
-
-    def init_selenium(self):
-        fb.login_with(self.webdriver, self.user)
+    def __init__(self, prevent_shutdown=False):
+        super().__init__('alex', dev=True, archive=False, prevent_shutdown=prevent_shutdown)
 
     def test_maximal_delay(self, trial_sets, trials):
         max_mean_delta_results = []
@@ -22,7 +19,7 @@ class TestSupervisor(Supervisor):
                 delay_results = []
 
                 for trial in range(0, trials):
-                    delay_results.append(self.fbclock.timedelta_to_ms(self.fbclock.get_posting_delay_datum(self.webdriver)))
+                    delay_results.append(self.fbclock.timedelta_to_ms(self.fbclock.get_posting_delay_datum()))
                     print(f'{delay_results[-1]}ms')
 
                 delay_mean = statistics.mean(delay_results)
@@ -40,66 +37,56 @@ class TestSupervisor(Supervisor):
         delta_mean = statistics.mean(max_mean_delta_results)
         delta_max = max(max_mean_delta_results)
 
-        print(f'Delta ave={delta_mean}ms, max={delta_max}')
+        print(f'Delay delta ave={delta_mean}ms, max={delta_max}')
 
-    # def run_safety_tests(self, trials_per_test):
-    #     results = []
-    #
-    #     for safety_delay in range(200, 600, 100):
-    #         failures = self.run_safety_test(safety_delay, trials_per_test)
-    #         results.append({'delay':safety_delay, 'failures':failures})
-    #
-    #     for result in results:
-    #         print(f'{result["delay"]}ms delay: {result["failures"]/trials_per_test*100}% failure')
-    #
-    # def run_safety_test(self, delay, trials):
-    #     tests_complete = 0
-    #     failures = 0
-    #
-    #     self.safety_margin = timedelta(milliseconds=delay)
-    #
-    #     now = datetime.utcnow().replace(tzinfo=utc) + posting_delay
+    def passes_safety_test(self):
+        self.constraints.expiry = datetime.utcnow().replace(tzinfo=utc) + timedelta(minutes=1)
+        self.constraints.expiry -= timedelta(microseconds=self.constraints.expiry.microsecond)
+        print(f'New expiry: {self.constraints.expiry}')
 
-    # return failures
+        self.perform_main_loop()
+        print(f'Result: {"success" if self.auction_won() else "failure"}')
+
+        return self.auction_won()
 
 
 def test():
-    supervisor = TestSupervisor()
-    supervisor.test_maximal_delay(1, 10)
-    supervisor.webdriver.quit()
-# login_to_facebook(driver, auction_context)
-# posting_delay = get_offset(driver, auction_context)
-# load_auction_page(driver, auction_context)
-#
-# bid_tests = 15
-# tests_complete = 0
-# failures = 0
-#
-# now = datetime.utcnow().replace(tzinfo=utc) + posting_delay
-# while now < auction_context.auction.end_datetime:
-#     # Bear in mind that passing this test isn't a guarantee that it will work in production.
-#     # Test multiple times against a simulated auction
-#     if now > auction_context.auction.end_datetime - timedelta(milliseconds=100):
-#         print(f'Bidding at adjusted system time {now.strftime("%H:%M (%S.%fsec)")}')
-#         make_bid(driver, auction_context, 500)
-#
-#         driver.get(driver.current_url)
-#         post_registered = get_post_registered(driver)
-#         if auction_context.auction.end_datetime.second - post_registered.second > post_registered.second:
-#             spare_seconds = auction_context.auction.end_datetime - post_registered
-#         else:
-#             spare_seconds = 60 + auction_context.auction.end_datetime.second - post_registered.second
-#
-#         if post_registered < auction_context.auction.end_datetime:
-#             print(f'    Passed with {spare_seconds} seconds to spare (1sec optimal)')
-#         else:
-#             failures += 1
-#             print(f'    Failed to bid before auction expiry T_T')
-#
-#         tests_complete += 1
-#         auction_context.auction.end_datetime = auction_context.auction.end_datetime + timedelta(minutes=1)
-#
-#         if tests_complete >= bid_tests:
-#             print(f'Ran {tests_complete} tests - {failures} failed.')
-#             break
-#     now = datetime.utcnow().replace(tzinfo=utc) + posting_delay
+    validate_safety_margin(90)
+
+
+def validate_safety_margin(test_duration_minutes):
+    end_time = datetime.now() + timedelta(minutes=test_duration_minutes)
+
+    trials = 0
+    failures = 0
+    delay_safety_buffer_ms = None
+    successive_maximal_delays = []
+    deviations_from_last_second = []
+    try:
+        while datetime.now() < end_time:
+            supervisor = TestSupervisor()
+            supervisor.perform_main_loop()
+
+            successive_maximal_delays.append(supervisor.fbclock.maximal_delay.total_seconds() * 1000)
+
+            try:
+                deviations_from_last_second.append(supervisor.valid_bid_history[-1].timestamp.second - 59)
+            except IndexError:
+                deviations_from_last_second.append('???')
+
+            if not delay_safety_buffer_ms:
+                delay_safety_buffer_ms = supervisor.fbclock.maximal_delay_safety_buffer.total_seconds() * 1000
+
+            trials += 1
+            if not supervisor.auction_won():
+                failures += 1
+    except Exception as err:
+        # This may occur if facebook's spam detection prevents posting in sync or auction threads
+        print(err.__repr__())
+
+    print(f'\n{delay_safety_buffer_ms}ms delay buffer: {failures / (trials if trials else 1) * 100}% failure')
+    print(f'Delays: {"ms, ".join(str(math.floor(delay)) for delay in successive_maximal_delays)}ms')
+    print(f'Deviations: {", ".join(str(deviation) for deviation in deviations_from_last_second)}')
+
+
+test()

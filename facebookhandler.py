@@ -95,7 +95,10 @@ class FacebookHandler:
         try:
             return self.webdriver.find_element_by_class_name('_7791')
         except NoSuchElementException:
-            raise RuntimeError('get_comments_container(): Failed to find container element ._7791')
+            try:
+                return self.webdriver.find_element_by_class_name('_4eez')
+            except NoSuchElementException:
+                raise RuntimeError('get_comments_container(): Failed to find container element ._7791 or ._4eez')
 
     def remove_all_child_comments(self):
         child_comment_removal_script = '''
@@ -121,6 +124,23 @@ class FacebookHandler:
         post_registered = datetime.utcfromtimestamp(int(timestamp_str)).replace(tzinfo=utc)
 
         return post_registered
+
+    def delete_last_comment(self):
+        url = self.webdriver.current_url
+        try:
+            el = self.webdriver.find_elements_by_class_name('_2f3a')
+            action = ActionChains(self.webdriver)
+            action.move_to_element_with_offset(el[-1], 2, 2).click().send_keys('d').send_keys(Keys.ENTER).send_keys(
+                Keys.ENTER).perform()
+            sleep(0.5)  # todo use implicit wait
+
+            el = self.webdriver.find_elements_by_class_name('_4jy0')
+            action = ActionChains(self.webdriver)
+            action.move_to_element_with_offset(el[-1], 2, 2).click().send_keys(Keys.ENTER).perform()
+        except IndexError:
+            print('Attempted to delete comment: No comment exists')
+
+        self.webdriver.get(url)
 
     @staticmethod
     def get_comment_author(comment):

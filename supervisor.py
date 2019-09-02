@@ -2,6 +2,7 @@ import configparser
 from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
+import os
 
 from archiver import Archiver
 from bid import Bid
@@ -24,25 +25,39 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
-    safety_margin = timedelta(milliseconds=100)
+    safety_margin = timedelta(0)  # timedelta(milliseconds=100-500)  #todo get rid if not needed
 
     def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
 
-        if 'dev' in kwargs and kwargs['dev']:
+        if 'dev' in kwargs and kwargs['dev']:  # todo clean up kwargs - there must be a better way
             self.dev_mode = True
             config.read('test_config.ini')
         else:
             self.dev_mode = False
             config.read('live_config.ini')
 
+        if 'archive' in kwargs:
+            self.archive_mode = kwargs['archive']
+        else:
+            self.archive_mode = True
+
+        if 'prevent_shutdown' in kwargs:
+            self.prevent_shutdown = kwargs['prevent_shutdown']
+        else:
+            self.prevent_shutdown = False
+
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
         self.constraints = ConstraintSet(self.dev_mode)
-        self.extensions_remaining = self.constraints.extensions
+
         self.user = User(user_nickname)
 
+        self.extensions_remaining = self.constraints.extensions
+        self.initial_bid_made = False
+        self.most_recent_bid_submission = None
+
         self.webdriver = get_webdriver(self.user.id)
-        self.archiver = Archiver(self.webdriver)
+        self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
         self.fbclock = FacebookAuctionClock(self.fb, self.constraints, self.dev_mode)
@@ -76,19 +91,36 @@ class Supervisor:
                 self.iterate()
         except Exception as err:
             print(f'Error in perform_main_loop(): {err.__repr__()}')
-            self.archiver.save_error_dump_html()
+            self.save_error_dump_html()
             raise err
         finally:
             try:
-                self.shutdown()
+                self.perform_final_state_output()
+
+                # Clean up final post if it's the test auction
+                if self.dev_mode:
+                    self.fb.delete_last_comment()
             finally:
-                print('Quitting webdriver...')
-                self.webdriver.quit()
-            print('Exited gracefully')
+                if not self.prevent_shutdown:
+                    print('Quitting webdriver...')
+                    self.webdriver.quit()
+                else:
+                    print("Webdriver quit intentionally prevented (running in shutdown=False mode)")
+            print('Finished gracefully')
+
+    def save_error_dump_html(self):
+        try:
+            base_dir = os.getcwd()
+            timestamp = str(datetime.now().timestamp())
+            with open(os.path.join(base_dir, 'err_dump', f'{timestamp}.html'), 'wb+') as out:
+                out.write(self.webdriver.page_source.encode('utf-8'))
+                out.close()
+        except Exception as err:
+            print(f'Error writing error dump: {err.__repr__()}')
 
     def iterate(self):
         try:
-            self.fbclock.sync_if_required()
+            self.sync_clock_if_required()
             self.refresh_bid_history()
             self.countdown.proc()
 
@@ -108,6 +140,13 @@ class Supervisor:
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
+
+    def sync_clock_if_required(self):
+        if self.fbclock.sync_required():
+            self.fbclock.init_maximal_delay(5 if self.dev_mode else 10, self.get_auction_url())
+
+    def get_auction_url(self):
+        return f'https://www.facebook.com/groups/{self.fbgroup.id}/permalink/{self.auctionpost.id}/'
 
     def winning(self):
         try:
@@ -130,17 +169,22 @@ class Supervisor:
 
     def make_bid(self):
         bid_value = self.get_lowest_valid_bid_value()
-        print(f'Preparing to bid {bid_value}')
-        if bid_value > self.constraints.max_bid:
-            raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
-        comment_content = f'{bid_value}(autobid)' if self.dev_mode else str(bid_value)
-        print(f'Submitting "{comment_content}"')
-        self.fb.post_comment(comment_content)
+        if bid_value != self.most_recent_bid_submission:
+            print(f'Preparing to bid {bid_value}')
+            if bid_value > self.constraints.max_bid:
+                raise ValueError("make_bid(): You cannot bid more than your max_bid_amount!")
+            comment_content = f'{bid_value}(autobid)' if self.dev_mode else str(bid_value)
+            print(f'Submitting "{comment_content}"')
+            self.fb.post_comment(comment_content)
 
-        self.trigger_extension()
-        self.courtesy_bid_scheduled = None
-        self.valid_bid_history.append(Bid(self.user.id, bid_value))
-        sleep(0.05)
+            self.initial_bid_made = True
+            self.most_recent_bid_submission = bid_value
+            self.trigger_extension()
+            self.courtesy_bid_scheduled = None
+            self.valid_bid_history.append(Bid(self.user.id, bid_value))
+            sleep(0.05)
+        else:
+            print('Duplicate bid submission avoided')
 
     def trigger_extension(self):
         if self.extensions_remaining > 0 \
@@ -151,22 +195,31 @@ class Supervisor:
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
 
     def initial_bid_due(self):
-        return self.my_valid_bid_count < 1 and self.constraints.make_initial_bid
+        return self.constraints.make_initial_bid and not self.initial_bid_made
 
     def courtesy_bid_due(self):
         return False if not self.courtesy_bid_scheduled \
             else (self.my_valid_bid_count < self.constraints.minimum_bids
                   and self.fbclock.get_current_time() > self.courtesy_bid_scheduled)
 
-    def shutdown(self):
+    def perform_final_state_output(self):
+        self.refresh_final_state()
+        if self.archiver:
+            self.archive_final_state()
+        self.print_final_state()
+
+    def refresh_final_state(self):
         print('Performing final refresh of page and bid history...')
         self.fb.load_auction_page(self.fbgroup, self.auctionpost)
+        sleep(1)
         self.refresh_bid_history(True)
         print('    Refreshed!')
 
+    def archive_final_state(self):
         self.archiver.take_screenshot()
         self.archiver.save_final_state_html()
 
+    def print_final_state(self):
         print('Final Auction State:')
         self.print_bid_history()
 
@@ -187,6 +240,7 @@ class Supervisor:
                 my_valid_bid_count += 1
 
         self.my_valid_bid_count = my_valid_bid_count
+        self.initial_bid_made = (my_valid_bid_count > 0)
         self.valid_bid_history = valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
@@ -214,11 +268,10 @@ class Supervisor:
                 pass
             except StaleElementReferenceException:
                 pass
-            except NoSuchElementException as err:
-                print(err.__repr__())
+            except NoSuchElementException:
                 pass
             except Exception as err:
-                print('Exception in get_bid_history_quickly')
+                print('Unexpected exception in get_bid_history_quickly')
                 raise err
 
             if valid_bid_found:
@@ -286,11 +339,17 @@ class Supervisor:
                   f'({self.constraints.minimum_bids} required)')
 
     def print_auction_result(self):
-        if self.auction_won():
-            print(f'Auction won for {self.valid_bid_history[-1].value}NTD')
-        else:
-            print(f'Auction lost to {self.valid_bid_history[-1].bidder} ({self.valid_bid_history[-1].value}NTD)')
+        try:
+            if self.auction_won():
+                print(f'Auction won for {self.valid_bid_history[-1].value}NTD')
+            else:
+                print(f'Auction lost to {self.valid_bid_history[-1].bidder} ({self.valid_bid_history[-1].value}NTD)')
+        except IndexError:
+            print(f'Auction contains no valid bids... wtf happened?')
 
     def auction_won(self):
-        return self.valid_bid_history[-1].bidder == self.user.id \
-               and self.valid_bid_history[-1].timestamp < self.constraints.expiry
+        try:
+            return self.valid_bid_history[-1].bidder == self.user.id \
+                   and self.valid_bid_history[-1].timestamp < self.constraints.expiry
+        except IndexError:
+            return False

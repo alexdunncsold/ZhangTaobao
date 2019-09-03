@@ -136,7 +136,9 @@ class Supervisor:
 
             elif self.time_to_snipe():
                 print('time to snipe')
-                if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+                if not self.initial_snipe_performed \
+                        and self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+                    # Add a lucky 8 to the initial snipe
                     self.make_bid(1, 8)
                 else:
                     self.make_bid()
@@ -243,7 +245,7 @@ class Supervisor:
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
-            valid_bid_history = self.get_bid_history_newfast(comment_elem_list)
+            valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
         # Else if operating in non-critical mode
         else:
             valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
@@ -297,7 +299,11 @@ class Supervisor:
         if comment_idx != len(comment_elem_list) - 1:
             comment_elem = comment_elem_list[comment_idx]
             next_comment_elem = comment_elem_list[comment_idx + 1]
-            if comment_elem.author == self.user.id and comment_elem.timestamp == next_comment_elem.timestamp:
+            if comment_elem.author == self.user.id \
+                    and (comment_elem.timestamp == next_comment_elem.timestamp \
+                         or comment_elem.timestamp == next_comment_elem.timestamp + timedelta(seconds=1)) \
+                    and not bidparse.comment_parse(comment_elem).value > bidparse.comment_parse(
+                next_comment_elem).value:
                 a = 1
                 return True
         return False

@@ -121,7 +121,7 @@ class FacebookHandler:
         return submission_time
 
     def check_for_antispam_measures(self):
-        sleep(1)
+        sleep(0.5)
         if self.webdriver.find_elements_by_class_name('_4t2a'):
             raise SystemError('Fatal error: Facebook spam-detection filter activated!')
 

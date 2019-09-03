@@ -57,7 +57,7 @@ class Supervisor:
 
         self.extensions_remaining = self.constraints.extensions
 
-        self.webdriver = get_webdriver(self.user.id)
+        self.webdriver = get_webdriver(self.user.id, self.dev_mode)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])

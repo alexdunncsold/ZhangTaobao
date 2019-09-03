@@ -42,7 +42,6 @@ class FacebookAuctionClock:
 
     def auction_expired(self):
         return self.get_raw_time_remaining().days == -1
-        return
 
     # Get actual time, without posting-delay adjustment
     def get_raw_time_remaining(self):

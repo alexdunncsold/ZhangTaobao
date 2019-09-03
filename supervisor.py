@@ -3,7 +3,6 @@ from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
 import os
-import math
 
 from archiver import Archiver
 from bid import Bid
@@ -26,6 +25,10 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
     courtesy_bid_scheduled = None
+
+    initial_bid_made = False
+    initial_snipe_performed = False
+    most_recent_bid_submission = None
 
     def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
@@ -53,8 +56,6 @@ class Supervisor:
         self.user = User(user_nickname)
 
         self.extensions_remaining = self.constraints.extensions
-        self.initial_bid_made = False
-        self.most_recent_bid_submission = None
 
         self.webdriver = get_webdriver(self.user.id)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
@@ -126,19 +127,23 @@ class Supervisor:
 
             if self.winning():
                 pass
+
             elif not self.can_bid():
                 pass
+
             elif self.time_to_snipe():
                 print('time to snipe')
-                if self.constraints.max_bid >= self.get_lowest_valid_bid_value(2) + 8:
-                    self.make_bid(2, 8)
-                elif self.constraints.max_bid >= self.get_lowest_valid_bid_value(2):
-                    self.make_bid(2)
+                if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+                    self.make_bid(1, 8)
                 else:
                     self.make_bid()
+
+                self.initial_snipe_performed = True
+
             elif self.initial_bid_due():
                 print('time to make initial bid')
                 self.make_bid()
+
             elif (not self.critical_period_active()) and self.courtesy_bid_due():
                 print('time to make courtesy bid')  # doesn't seem to trigger correctly
                 self.make_bid()
@@ -170,7 +175,9 @@ class Supervisor:
             return self.constraints.starting_bid
 
     def time_to_snipe(self):
-        return self.fbclock.get_current_time() > self.constraints.expiry
+        initial_snipe_threshold = timedelta(seconds=4)
+        return (self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold
+                and not self.initial_snipe_performed) or self.fbclock.get_current_time() > self.constraints.expiry
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
@@ -208,6 +215,7 @@ class Supervisor:
                   and self.fbclock.get_current_time() > self.courtesy_bid_scheduled)
 
     def perform_final_state_output(self):
+        sleep(1)
         self.refresh_final_state()
         if self.archiver:
             self.archive_final_state()
@@ -216,7 +224,6 @@ class Supervisor:
     def refresh_final_state(self):
         print('Performing final refresh of page and bid history...')
         self.fb.load_auction_page(self.fbgroup, self.auctionpost)
-        sleep(1)
         self.refresh_bid_history(True)
         print('    Refreshed!')
 

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
-import facebookhandler as fb
 import math
 from pytz import utc
 import statistics
+import configparser
+from time import sleep
 
 from supervisor import Supervisor
 
@@ -51,10 +52,10 @@ class TestSupervisor(Supervisor):
 
 
 def test():
-    validate_safety_margin(90)
+    validate_safety_margin(10)
 
 
-def validate_safety_margin(test_duration_minutes):
+def validate_safety_margin(test_duration_minutes, minutes_between_tests=0):
     end_time = datetime.now() + timedelta(minutes=test_duration_minutes)
 
     trials = 0
@@ -87,6 +88,46 @@ def validate_safety_margin(test_duration_minutes):
     print(f'\n{delay_safety_buffer_ms}ms delay buffer: {failures / (trials if trials else 1) * 100}% failure')
     print(f'Delays: {"ms, ".join(str(math.floor(delay)) for delay in successive_maximal_delays)}ms')
     print(f'Deviations: {", ".join(str(deviation) for deviation in deviations_from_last_second)}')
+    print(f'waiting {minutes_between_tests} minutes')
+    sleep(minutes_between_tests * 60)
+    print(f'wait is over, iterating')
 
 
-test()
+def perform_tuning_run(trials, minutes_between_tests=0):
+    try:
+        for trial in range(0, trials):
+            supervisor = TestSupervisor()
+            supervisor.perform_main_loop()
+            if not supervisor.auction_won():
+                return False
+
+            print(f'waiting {minutes_between_tests} minutes')
+            sleep(minutes_between_tests * 60)
+            print(f'wait is over, iterating')
+    except Exception as err:
+        # This may occur if facebook's spam detection prevents posting in sync or auction threads
+        print(err.__repr__())
+        raise err
+
+    return True
+
+
+def tune_safety_margin(successive_passes_required=20):
+    step_value = 50
+    config = configparser.ConfigParser()
+    config.read('sync_config.ini')
+
+    passed = False
+    while not passed:
+        passed = perform_tuning_run(successive_passes_required, 5)
+
+        if not passed:
+            current_buffer = int(config['settings']['DelaySafetyBufferMilliseconds'])
+            print(f'Failed at buffer={current_buffer}ms, increasing by {step_value}')
+            config.set('settings', 'DelaySafetyBufferMilliseconds', str(current_buffer + step_value))
+            with open('sync_config.ini', 'w') as configfile:
+                config.write(configfile)
+
+
+# test()
+tune_safety_margin()

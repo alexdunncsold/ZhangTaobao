@@ -1,4 +1,4 @@
 from supervisor import Supervisor
 
-supervisor = Supervisor('ztb', dev=True, archive=False)
+supervisor = Supervisor()
 supervisor.perform_main_loop()

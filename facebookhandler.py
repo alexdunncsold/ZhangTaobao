@@ -107,6 +107,7 @@ class FacebookHandler:
                 '''
         self.webdriver.execute_script(child_comment_removal_script)
 
+    # Posts a fb comment on the current page, returning the system post-submission time
     def post_comment(self, content):
         all_comments_elem = self.webdriver.find_element_by_css_selector('[data-testid="UFI2CommentsList/root_depth_0"]')
         comment_form = all_comments_elem.find_elements_by_tag_name("form")[-1]
@@ -114,7 +115,14 @@ class FacebookHandler:
         reply_elem = comment_form.find_element_by_class_name("_5rpu")
 
         reply_elem.send_keys(content)
+        submission_time = datetime.utcnow().replace(tzinfo=utc)
         reply_elem.send_keys(Keys.RETURN)
+
+        if self.webdriver.find_elements_by_class_name('_4t2a'):
+            print('Facebook spam-detection filter activated! Exception should be thrown')
+            raise SystemError('Facebook spam-detection filter activated!')
+
+        return submission_time
 
     def get_last_comment_registered_at(self):
         # refresh page to ensure that correct timestamp is loaded in DOM

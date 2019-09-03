@@ -9,6 +9,9 @@ from time import sleep
 import math
 import statistics
 
+import random
+
+
 class FacebookAuctionClock:
 
     def __init__(self, fb, constraints, dev_mode=False):
@@ -115,28 +118,50 @@ class FacebookAuctionClock:
         except RuntimeError as err:
             print(f'\n    {err.__repr__()}')
 
-        return timedelta(milliseconds=statistics.mean(delay_results_ms)) if delay_results_ms \
+        print(f'\ndelay-data ({statistics.mean(delay_results_ms)}ms): {sorted(delay_results_ms)}')
+        print(
+            f'culled to  ({statistics.mean(self.strip_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
+        print(
+            f'lows-culled ({statistics.mean(self.strip_low_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
+        return timedelta(milliseconds=statistics.mean((delay_results_ms))) if delay_results_ms \
             else self.default_posting_delay
+
+    @staticmethod
+    def strip_outliers(data, factor=1.5):
+        mean = statistics.mean(data)
+        sd = statistics.stdev(data, mean)
+        return [item for item in data if abs(item - mean) < factor * sd]
+
+    @staticmethod
+    def strip_low_outliers(data, factor=1.5):
+        mean = statistics.mean(data)
+        sd = statistics.stdev(data, mean)
+        return [item for item in data if item >= mean or abs(item - mean) < factor * sd]
 
     def get_posting_delay_datum(self):
         # If this method is called without being on sync page, load sync page
         if self.group.name not in self.fb.webdriver.title:
             self.load_sync_page()
 
-        accuracy_tolerance = 0
-        while datetime.now().microsecond > 1000 + accuracy_tolerance:
-            # Do nothing - we want to sync as close to on-the-second as possible
-            accuracy_tolerance += 25
+        # accuracy_tolerance = 0
+        # while datetime.now().microsecond > 1000 + accuracy_tolerance:
+        #     # Do nothing - we want to sync as close to on-the-second as possible
+        #     accuracy_tolerance += 25
 
         print('.', end='')
-        post_attempted = datetime.utcnow().replace(tzinfo=utc)
-        self.fb.post_comment('    Syncing...')
+        post_attempted = self.fb.post_comment(self.nonsense() if self.dev_mode else '    Syncing...')
         self.fb.webdriver.get(self.url)
         post_registered = self.fb.get_last_comment_registered_at()
-        posting_delay = post_registered - post_attempted + timedelta(seconds=1)
+        posting_delay = post_registered - post_attempted + timedelta(milliseconds=500)
 
         # Perform cleanup
         sleep(1)  # todo use implicit_wait
         self.fb.delete_last_comment()
 
         return posting_delay
+
+    def nonsense(self):
+        word_count = random.randint(3, 10)
+        word_list = ('here', 'are', 'some', 'words', 'to', 'try', 'and', 'beat', 'the', 'spam', 'filter')
+        output = ' '.join([word_list[random.randint(0, len(word_list) - 1)] for word in range(0, word_count)])
+        return output

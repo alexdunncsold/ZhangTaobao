@@ -3,6 +3,7 @@ from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
 import os
+import math
 
 from archiver import Archiver
 from bid import Bid
@@ -147,7 +148,7 @@ class Supervisor:
 
     def sync_clock_if_required(self):
         if self.fbclock.sync_required():
-            self.fbclock.init_maximal_delay(5 if self.dev_mode else 10, self.get_auction_url())
+            self.fbclock.init_maximal_delay(10, self.get_auction_url())
 
     def get_auction_url(self):
         return f'https://www.facebook.com/groups/{self.fbgroup.id}/permalink/{self.auctionpost.id}/'

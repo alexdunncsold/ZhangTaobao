@@ -122,11 +122,11 @@ class FacebookAuctionClock:
             f'culled to  ({statistics.mean(self.strip_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
         print(
             f'lows-culled ({statistics.mean(self.strip_low_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
-        return timedelta(milliseconds=statistics.mean(delay_results_ms)) if delay_results_ms \
+        return timedelta(milliseconds=statistics.mean(self.strip_outliers(delay_results_ms))) if delay_results_ms \
             else self.default_posting_delay
 
     @staticmethod
-    def strip_outliers(data, factor=1.5):
+    def strip_outliers(data, factor=3):
         mean = statistics.mean(data)
         sd = statistics.stdev(data, mean)
         return [item for item in data if abs(item - mean) < factor * sd]
@@ -144,6 +144,9 @@ class FacebookAuctionClock:
 
         print('.', end='')
         post_attempted = self.fb.post_comment(self.nonsense() if self.dev_mode else '    Syncing...')
+
+        self.fb.check_for_antispam_measures()
+
         self.fb.webdriver.get(self.url)
         post_registered = self.fb.get_last_comment_registered_at()
         posting_delay = post_registered - post_attempted + timedelta(milliseconds=500)

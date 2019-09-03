@@ -118,11 +118,12 @@ class FacebookHandler:
         submission_time = datetime.utcnow().replace(tzinfo=utc)
         reply_elem.send_keys(Keys.RETURN)
 
-        if self.webdriver.find_elements_by_class_name('_4t2a'):
-            print('Facebook spam-detection filter activated! Exception should be thrown')
-            raise SystemError('Facebook spam-detection filter activated!')
-
         return submission_time
+
+    def check_for_antispam_measures(self):
+        sleep(1)
+        if self.webdriver.find_elements_by_class_name('_4t2a'):
+            raise SystemError('Fatal error: Facebook spam-detection filter activated!')
 
     def get_last_comment_registered_at(self):
         # refresh page to ensure that correct timestamp is loaded in DOM

@@ -74,11 +74,14 @@ class Supervisor:
     def init_selenium(self):
         self.fb.login_with(self.user)
         self.user.id = self.fb.get_facebook_id(dev=self.dev_mode)
-        self.fb.load_auction_page(self.fbgroup, self.auctionpost)
+        self.load_auction_page()
         self.auctionpost.name = self.fb.get_auction_name()
         self.print_preamble()
         self.refresh_bid_history(True)
         self.print_bid_history()
+
+    def load_auction_page(self):
+        self.fb.load_auction_page(self.fbgroup, self.auctionpost)
 
     def print_preamble(self):
         print(
@@ -193,7 +196,6 @@ class Supervisor:
             self.most_recent_bid_submission = bid_value
             self.trigger_extension()
             self.courtesy_bid_scheduled = None
-            self.valid_bid_history.append(Bid(self.user.id, bid_value))
             sleep(0.05)
         else:
             print('Duplicate bid submission avoided')
@@ -223,7 +225,7 @@ class Supervisor:
 
     def refresh_final_state(self):
         print('Performing final refresh of page and bid history...')
-        self.fb.load_auction_page(self.fbgroup, self.auctionpost)
+        self.load_auction_page()
         self.refresh_bid_history(True)
         print('    Refreshed!')
 
@@ -241,7 +243,7 @@ class Supervisor:
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
-            valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
+            valid_bid_history = self.get_bid_history_newfast(comment_elem_list)
         # Else if operating in non-critical mode
         else:
             valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
@@ -256,41 +258,49 @@ class Supervisor:
         self.valid_bid_history = valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
-        valid_bid_history = self.valid_bid_history if self.valid_bid_history else []
-        valid_bid_found = False
+        valid_bid_history = []
 
-        # Look for the most recent bid gte the known high bid and consider that to be the high bid
-        for comment in reversed(comment_elem_list):
+        # for idx, comment in enumerate(comment_elem_list, start=len(self.valid_bid_history)):
+        for idx, comment in enumerate(comment_elem_list):
             try:
                 candidate_bid = bidparse.comment_parse(comment)
 
+                if candidate_bid.timestamp >= self.constraints.expiry:
+                    raise ValueError()
+
+                if self.potentially_contested(idx, comment_elem_list):
+                    print(f"User's bid of {candidate_bid.value} may be contested - disregarding bid")
+                    raise ValueError
+
                 if not valid_bid_history \
                         or candidate_bid.value >= valid_bid_history[-1].value + self.constraints.min_bid_step:
+
+                    # If this isn't running during initialisation
                     if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
-                        print(f'New bid detected (desperation mode)!')
+                        print(f'New bid detected! (fast-mode)')
                         self.print_bid(candidate_bid)
+                        if not self.courtesy_bid_scheduled:
+                            self.schedule_courtesy_bid()
 
                     valid_bid_history.append(candidate_bid)
-                    valid_bid_found = True
-
-                elif candidate_bid.value == valid_bid_history[-1].value:
-                    valid_bid_found = True
-
             except ValueError:
-                pass
-            except StaleElementReferenceException:
                 pass
             except NoSuchElementException:
                 pass
-            except Exception as err:
-                print('Unexpected exception in get_bid_history_quickly')
-                raise err
-
-            if valid_bid_found:
-                # Break out of the loop and respond to the new bid immediately
-                break
+            except Exception:
+                pass
 
         return valid_bid_history
+
+    # Detects user's bids that appear to precede competing bids in client but may not on server
+    def potentially_contested(self, comment_idx, comment_elem_list):
+        if comment_idx != len(comment_elem_list) - 1:
+            comment_elem = comment_elem_list[comment_idx]
+            next_comment_elem = comment_elem_list[comment_idx + 1]
+            if comment_elem.author == self.user.id and comment_elem.timestamp == next_comment_elem.timestamp:
+                a = 1
+                return True
+        return False
 
     def get_bid_history_accurately(self, comment_elem_list):
         valid_bid_history = []

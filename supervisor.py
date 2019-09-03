@@ -24,7 +24,6 @@ from webdriver import get_webdriver
 class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
-    courtesy_bid_scheduled = None
 
     initial_bid_made = False
     initial_snipe_performed = False
@@ -149,10 +148,6 @@ class Supervisor:
                 print('time to make initial bid')
                 self.make_bid()
 
-            elif (not self.critical_period_active()) and self.courtesy_bid_due():
-                print('time to make courtesy bid')  # doesn't seem to trigger correctly
-                self.make_bid()
-
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
 
@@ -197,7 +192,6 @@ class Supervisor:
             self.initial_bid_made = True
             self.most_recent_bid_submission = bid_value
             self.trigger_extension()
-            self.courtesy_bid_scheduled = None
             sleep(0.05)
         else:
             print('Duplicate bid submission avoided')
@@ -212,11 +206,6 @@ class Supervisor:
 
     def initial_bid_due(self):
         return self.constraints.make_initial_bid and not self.initial_bid_made
-
-    def courtesy_bid_due(self):
-        return False if not self.courtesy_bid_scheduled \
-            else (self.my_valid_bid_count < self.constraints.minimum_bids
-                  and self.fbclock.get_current_time() > self.courtesy_bid_scheduled)
 
     def perform_final_state_output(self):
         sleep(1)
@@ -281,8 +270,6 @@ class Supervisor:
                     if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
                         print(f'New bid detected! (fast-mode)')
                         self.print_bid(candidate_bid)
-                        if not self.courtesy_bid_scheduled:
-                            self.schedule_courtesy_bid()
 
                     valid_bid_history.append(candidate_bid)
             except ValueError:
@@ -304,7 +291,6 @@ class Supervisor:
                          or comment_elem.timestamp == next_comment_elem.timestamp + timedelta(seconds=1)) \
                     and not bidparse.comment_parse(comment_elem).value > bidparse.comment_parse(
                 next_comment_elem).value:
-                a = 1
                 return True
         return False
 
@@ -325,8 +311,6 @@ class Supervisor:
                     if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
                         print(f'New bid detected!')
                         self.print_bid(candidate_bid)
-                        if not self.courtesy_bid_scheduled:
-                            self.schedule_courtesy_bid()
 
                     valid_bid_history.append(candidate_bid)
             except ValueError:
@@ -337,12 +321,6 @@ class Supervisor:
                 pass
 
         return valid_bid_history
-
-    def schedule_courtesy_bid(self):
-        if self.more_bids_required():
-            now = self.fbclock.get_current_time()
-            print(f'Scheduling bid for {now}')
-            self.courtesy_bid_scheduled = now if self.dev_mode else now + (self.constraints.expiry - now) / 2
 
     def more_bids_required(self):
         return self.my_valid_bid_count < self.constraints.minimum_bids

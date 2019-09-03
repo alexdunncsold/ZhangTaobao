@@ -123,7 +123,7 @@ class FacebookAuctionClock:
             f'culled to  ({statistics.mean(self.strip_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
         print(
             f'lows-culled ({statistics.mean(self.strip_low_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
-        return timedelta(milliseconds=statistics.mean((delay_results_ms))) if delay_results_ms \
+        return timedelta(milliseconds=statistics.mean(delay_results_ms)) if delay_results_ms \
             else self.default_posting_delay
 
     @staticmethod
@@ -143,11 +143,6 @@ class FacebookAuctionClock:
         if self.group.name not in self.fb.webdriver.title:
             self.load_sync_page()
 
-        # accuracy_tolerance = 0
-        # while datetime.now().microsecond > 1000 + accuracy_tolerance:
-        #     # Do nothing - we want to sync as close to on-the-second as possible
-        #     accuracy_tolerance += 25
-
         print('.', end='')
         post_attempted = self.fb.post_comment(self.nonsense() if self.dev_mode else '    Syncing...')
         self.fb.webdriver.get(self.url)
@@ -160,7 +155,8 @@ class FacebookAuctionClock:
 
         return posting_delay
 
-    def nonsense(self):
+    @staticmethod
+    def nonsense():
         word_count = random.randint(3, 10)
         word_list = ('here', 'are', 'some', 'words', 'to', 'try', 'and', 'beat', 'the', 'spam', 'filter')
         output = ' '.join([word_list[random.randint(0, len(word_list) - 1)] for word in range(0, word_count)])

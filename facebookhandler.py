@@ -95,7 +95,10 @@ class FacebookHandler:
         try:
             return self.webdriver.find_element_by_class_name('_7791')
         except NoSuchElementException:
-            raise RuntimeError('get_comments_container(): Failed to find container element ._7791')
+            try:
+                return self.webdriver.find_element_by_class_name('_4eez')
+            except NoSuchElementException:
+                raise RuntimeError('get_comments_container(): Failed to find container element ._7791 or ._4eez')
 
     def remove_all_child_comments(self):
         child_comment_removal_script = '''
@@ -104,6 +107,7 @@ class FacebookHandler:
                 '''
         self.webdriver.execute_script(child_comment_removal_script)
 
+    # Posts a fb comment on the current page, returning the system post-submission time
     def post_comment(self, content):
         all_comments_elem = self.webdriver.find_element_by_css_selector('[data-testid="UFI2CommentsList/root_depth_0"]')
         comment_form = all_comments_elem.find_elements_by_tag_name("form")[-1]
@@ -111,7 +115,15 @@ class FacebookHandler:
         reply_elem = comment_form.find_element_by_class_name("_5rpu")
 
         reply_elem.send_keys(content)
+        submission_time = datetime.utcnow().replace(tzinfo=utc)
         reply_elem.send_keys(Keys.RETURN)
+
+        return submission_time
+
+    def check_for_antispam_measures(self):
+        sleep(0.5)
+        if self.webdriver.find_elements_by_class_name('_4t2a'):
+            raise SystemError('Fatal error: Facebook spam-detection filter activated!')
 
     def get_last_comment_registered_at(self):
         # refresh page to ensure that correct timestamp is loaded in DOM
@@ -121,6 +133,23 @@ class FacebookHandler:
         post_registered = datetime.utcfromtimestamp(int(timestamp_str)).replace(tzinfo=utc)
 
         return post_registered
+
+    def delete_last_comment(self):
+        url = self.webdriver.current_url
+        try:
+            el = self.webdriver.find_elements_by_class_name('_2f3a')
+            action = ActionChains(self.webdriver)
+            action.move_to_element_with_offset(el[-1], 2, 2).click().send_keys('d').send_keys(Keys.ENTER).send_keys(
+                Keys.ENTER).perform()
+            sleep(0.5)  # todo use implicit wait
+
+            el = self.webdriver.find_elements_by_class_name('_4jy0')
+            action = ActionChains(self.webdriver)
+            action.move_to_element_with_offset(el[-1], 2, 2).click().send_keys(Keys.ENTER).perform()
+        except IndexError:
+            print('Attempted to delete comment: No comment exists')
+
+        self.webdriver.get(url)
 
     @staticmethod
     def get_comment_author(comment):

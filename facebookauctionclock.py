@@ -40,8 +40,8 @@ class FacebookAuctionClock:
         system_time = datetime.utcnow().replace(tzinfo=utc)
         return self.constraints.expiry - system_time < self.sync_threshold and not self.maximal_delay
 
-    def auction_expired(self):
-        return self.get_raw_time_remaining().days == -1
+    def auction_last_call(self):
+        return self.get_time_remaining().days == -1
 
     # Get actual time, without posting-delay adjustment
     def get_raw_time_remaining(self):

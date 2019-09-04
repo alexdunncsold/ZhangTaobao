@@ -90,7 +90,7 @@ class Supervisor:
 
     def perform_main_loop(self):
         try:
-            while not self.fbclock.auction_expired():
+            while not self.fbclock.auction_last_call():
                 self.iterate()
         except Exception as err:
             print(f'Error in perform_main_loop(): {err.__repr__()}')
@@ -177,7 +177,8 @@ class Supervisor:
     def time_to_snipe(self):
         initial_snipe_threshold = timedelta(seconds=4)
         return (self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold
-                and not self.initial_snipe_performed) or self.fbclock.get_current_time() > self.constraints.expiry
+                and not self.initial_snipe_performed) \
+               or self.fbclock.auction_last_call()
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
@@ -338,7 +339,7 @@ class Supervisor:
         print('Current Bid History:')
         for bid in self.valid_bid_history:
             self.print_bid(bid)
-        if self.fbclock.auction_expired():
+        if self.fbclock.auction_last_call():
             self.print_auction_result()
         else:
             print(f'{self.user.id} has made {self.my_valid_bid_count} valid bids so far '

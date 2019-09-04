@@ -18,7 +18,7 @@ def get_webdriver(user_id, use_gui):
     else:
         raise RuntimeError('Error while setting webdriver options: platform {} not supported.'.format(platform))
 
-    if not use_gui:
+    if not use_gui or platform == 'linux':
         options.add_argument('--disable-gpu')
         options.add_argument('--headless')
         options.add_argument('--remote-debugging-port=9222')

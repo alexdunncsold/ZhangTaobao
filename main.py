@@ -1,4 +1,4 @@
 from supervisor import Supervisor
 
-supervisor = Supervisor(dev=True)
+supervisor = Supervisor()
 supervisor.perform_main_loop()

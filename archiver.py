@@ -16,14 +16,6 @@ class Archiver:
         except Exception:
             print('Could not create directory for output.  Output will not be saved.')
 
-    def save_error_dump_html(self):
-        try:
-            with open(os.path.join(self.path, 'err_dump.html'), 'wb+') as out:
-                out.write(self.webdriver.page_source.encode('utf-8'))
-                out.close()
-        except Exception:
-            print('Error writing error dump.')
-
     def save_final_state_html(self):
         try:
             with open(os.path.join(self.path, 'final_state.html'), 'wb+') as out:

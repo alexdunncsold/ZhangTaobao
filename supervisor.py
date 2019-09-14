@@ -49,17 +49,15 @@ class Supervisor:
         else:
             self.prevent_shutdown = False
 
-        self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
-        self.constraints = ConstraintSet(self.dev_mode)
 
         self.user = User(user_nickname)
-
-        self.extensions_remaining = self.constraints.extensions
-
         self.webdriver = get_webdriver(self.user.id, self.dev_mode)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
+        self.auctionpost = AuctionPost(config['Auction']['AuctionId'], self.fbgroup.id)
+        self.constraints = ConstraintSet(self.dev_mode)
+        self.extensions_remaining = self.constraints.extensions
         self.fbclock = FacebookAuctionClock(self.fb, self.constraints, self.dev_mode)
         self.countdown = CountdownTimer(self.fbclock)
 

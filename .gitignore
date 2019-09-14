@@ -10,4 +10,5 @@ venv
 
 account_config.ini
 instance_config.ini
+live_config.ini
 

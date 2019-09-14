@@ -35,14 +35,14 @@ def strip_separators(text):
 
 
 def parse_seller(text):
-    pass
+    return 'not yet implemented'
 
 
 def parse_producer(text):
     try:
         producer = strip_separators(re.search(f'(?<=茶廠)[{seps}]*.*', text)[0])
     except:
-        return 'unable to parse'
+        return None
 
     return producer
 
@@ -51,7 +51,7 @@ def parse_production(text):
     try:
         production = strip_separators(re.search(f'(?<=品名)[{seps}]*.*', text)[0])
     except:
-        return 'unable to parse'
+        return None
 
     return production
 
@@ -60,7 +60,7 @@ def parse_production_year(text):
     try:
         production_year = strip_separators(re.search(f'(?<=年份)[{seps}]*\d\d\d\d', text)[0])
     except:
-        return 'unable to parse'
+        return None
 
     return production_year
 
@@ -69,7 +69,7 @@ def parse_weight(text):
     try:
         production_year = strip_separators(re.search(f'(?<=規格)[{seps}]*\d*(?=克)', text)[0])
     except:
-        return 'unable to parse'
+        return None
 
     return production_year
 
@@ -78,7 +78,7 @@ def parse_tea_type(text):
     try:
         tea_type = strip_separators(re.search(f'(?<=生熟).*', text)[0])
     except ValueError:
-        return 'unable to parse'
+        return None
 
     if tea_type == '生茶':
         return 'sheng'
@@ -96,7 +96,7 @@ def parse_storage_type(text):
         if not storage_type:
             raise ValueError()
     except ValueError:
-        storage_type = 'unable to parse'
+        storage_type = None
 
     storage_type_translations = {
         '乾': 'dry',
@@ -136,7 +136,7 @@ def parse_expiry(text):
 
         expiry = datetime(datetime.now().year, month, day, hour, minute)
     except ValueError:
-        return 'unable to parse'
+        return None
 
     return expiry
 
@@ -145,7 +145,7 @@ def parse_bid_step(text):
     try:
         bid_step = re.search('(?<=每步)\+?\d*', text)[0].replace('+','')
     except:
-        return 'could not parse'
+        return None
 
     return int(bid_step)
 
@@ -154,7 +154,7 @@ def parse_minimum_bid(text):
     try:
         minimum_bid = re.search('(?<=起標)\d*(?=元)', text)[0].replace('+', '')
     except:
-        return 'could not parse'
+        return None
 
     return int(minimum_bid)
 

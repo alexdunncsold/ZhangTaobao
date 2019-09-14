@@ -33,6 +33,7 @@ def strip_separators(text):
         text = text.replace(c, '')
     return text
 
+
 def parse_seller(text):
     pass
 

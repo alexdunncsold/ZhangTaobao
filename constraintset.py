@@ -4,32 +4,30 @@ from pytz import utc, timezone
 
 
 class ConstraintSet:
-    def __init__(self, dev_mode=False):
+    def __init__(self, auction_config_section):
         config = configparser.ConfigParser()
         group_config = configparser.ConfigParser()
         group_config.read('group_config.ini')
 
-        if dev_mode:
-            config.read('test_config.ini')
+        if auction_config_section['GroupNickname'] == 'dev':
             tz = timezone(group_config['dev']['Timezone'])
         else:
-            config.read('live_config.ini')
             tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
 
-        if config['Constraints']['Expiry'] == 'generateShort':
+        if auction_config_section['Expiry'] == 'generateShort':
             self.expiry = self.get_short_expiry()
-        elif config['Constraints']['Expiry'] == 'generateMedium':
+        elif auction_config_section['Expiry'] == 'generateMedium':
             self.expiry = self.get_medium_expiry()
-        elif config['Constraints']['Expiry'] == 'generateLong':
+        elif auction_config_section['Expiry'] == 'generateLong':
             self.expiry = self.get_long_expiry()
         else:
-            self.expiry = self.parse_auction_datetime(config['Constraints']['Expiry'], tz)
-        self.extensions = int(config['Constraints']['Extensions'])
-        self.make_initial_bid = True if config['Constraints']['MakeInitialBid'] == 'True' else False
-        self.minimum_bids = int(config['Constraints']['MinimumBids'])
-        self.starting_bid = int(config['Constraints']['StartingBid'])
-        self.min_bid_step = int(config['Constraints']['BidStep'])
-        self.max_bid = int(config['Constraints']['MaxBid'])
+            self.expiry = self.parse_auction_datetime(auction_config_section['Expiry'], tz)
+        self.extensions = int(auction_config_section['Extensions'])
+        self.make_initial_bid = True if auction_config_section['MakeInitialBid'] == 'True' else False
+        self.minimum_bids = int(auction_config_section['MinimumBids'])
+        self.starting_bid = int(auction_config_section['StartingBid'])
+        self.min_bid_step = int(auction_config_section['BidStep'])
+        self.max_bid = int(auction_config_section['MaxBid'])
 
     def parse_auction_datetime(self, dt_string, tz):
         # input must be in YYYY/MM/DD hh:mm or YYYY/MM/DD hh:mm:ss format

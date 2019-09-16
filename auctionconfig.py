@@ -33,7 +33,7 @@ def get_unexpired_auctions(**kwargs):
         if constraints.expiry > datetime.utcnow().replace(tzinfo=utc):
             planned_auctions.append(AuctionInstance(auction_post, constraints))
 
-    return planned_auctions
+    return sorted(planned_auctions)
 
 
 def load_config(**kwargs):

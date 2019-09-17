@@ -2,6 +2,7 @@ import configparser
 from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
+from auctionconfig import  get_unexpired_auctions
 import os
 
 from archiver import Archiver
@@ -22,6 +23,12 @@ from webdriver import get_webdriver
 
 
 class Supervisor:
+    auctionpost = None
+    constraints = None
+    extensions_remaining = None
+    fbclock = None
+    countdown = None
+
     valid_bid_history = None
     my_valid_bid_count = 0
 
@@ -54,23 +61,43 @@ class Supervisor:
         self.webdriver = get_webdriver(self.user.id, self.dev_mode)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
-        self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
-        self.auctionpost = AuctionPost(config['Auction']['AuctionId'], self.fbgroup.id)
-        self.constraints = ConstraintSet(self.dev_mode)
-        self.extensions_remaining = self.constraints.extensions
-        self.fbclock = FacebookAuctionClock(self.fb, self.constraints, self.dev_mode)
-        self.countdown = CountdownTimer(self.fbclock)
 
         try:
             self.init_selenium()
         except Exception as err:
-            print(f'Encountered exception in supervisor init:{err.__repr__()}')
+            print(f'Encountered exception in selenium init:{err.__repr__()}')
             self.webdriver.quit()
             raise err
+
+        self.pending_auctions = get_unexpired_auctions(dev=self.dev_mode)
+        self.run()
 
     def init_selenium(self):
         self.fb.login_with(self.user)
         self.user.id = self.fb.get_facebook_id(dev=self.dev_mode)
+
+    def run(self):
+        try:
+            for auction in self.pending_auctions:
+                self.prepare_for_auction(auction)
+                self.perform_main_loop()
+        finally:
+            if not self.prevent_shutdown:
+                print('Quitting webdriver...')
+                self.webdriver.quit()
+            else:
+                print("Webdriver quit intentionally prevented (running in shutdown=False mode)")
+
+    print('Finished gracefully')
+
+    def prepare_for_auction(self, auction_instance):
+        self.fbgroup = FbGroup()
+        self.auctionpost = auction_instance.auction_post
+        self.constraints = auction_instance.constraints
+        self.extensions_remaining = auction_instance.constraints.extensions
+        self.fbclock = FacebookAuctionClock(self.fb, auction_instance.constraints, self.dev_mode)
+        self.countdown = CountdownTimer(self.fbclock)
+
         self.load_auction_page()
         self.auctionpost.name = self.fb.get_auction_name()
         self.print_preamble()
@@ -95,19 +122,7 @@ class Supervisor:
             self.save_error_dump_html()
             raise err
         finally:
-            try:
-                self.perform_final_state_output()
-
-                # Clean up final post if it's the test auction
-                if self.dev_mode:
-                    self.fb.delete_last_comment()
-            finally:
-                if not self.prevent_shutdown:
-                    print('Quitting webdriver...')
-                    self.webdriver.quit()
-                else:
-                    print("Webdriver quit intentionally prevented (running in shutdown=False mode)")
-            print('Finished gracefully')
+            self.perform_final_state_output()
 
     def save_error_dump_html(self):
         try:

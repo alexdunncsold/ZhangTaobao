@@ -56,7 +56,6 @@ class Supervisor:
         else:
             self.prevent_shutdown = False
 
-
         self.user = User(user_nickname)
         self.webdriver = get_webdriver(self.user.id, self.dev_mode)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
@@ -70,15 +69,17 @@ class Supervisor:
             raise err
 
         self.pending_auctions = get_unexpired_auctions(dev=self.dev_mode)
-        self.run()
 
     def init_selenium(self):
         self.fb.login_with(self.user)
         self.user.id = self.fb.get_facebook_id(dev=self.dev_mode)
 
     def run(self):
+        print(
+            f'Covering the following auctions:\n{["    " + auction.auction_post.id + " " + str(auction.constraints.expiry) for auction in self.pending_auctions]}')
         try:
             for auction in self.pending_auctions:
+                print('#' * 100 + '\nStarting new auction\n' + '#' * 100)
                 self.prepare_for_auction(auction)
                 self.perform_main_loop()
         finally:
@@ -91,12 +92,19 @@ class Supervisor:
     print('Finished gracefully')
 
     def prepare_for_auction(self, auction_instance):
-        self.fbgroup = FbGroup()
+        self.fbgroup = FbGroup(id=auction_instance.auction_post.group_id)  # todo make this less terrible
         self.auctionpost = auction_instance.auction_post
         self.constraints = auction_instance.constraints
         self.extensions_remaining = auction_instance.constraints.extensions
         self.fbclock = FacebookAuctionClock(self.fb, auction_instance.constraints, self.dev_mode)
         self.countdown = CountdownTimer(self.fbclock)
+
+        self.valid_bid_history = None
+        self.my_valid_bid_count = 0
+
+        self.initial_bid_made = False
+        self.initial_snipe_performed = False
+        self.most_recent_bid_submission = None
 
         self.load_auction_page()
         self.auctionpost.name = self.fb.get_auction_name()

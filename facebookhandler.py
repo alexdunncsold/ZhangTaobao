@@ -154,7 +154,7 @@ class FacebookHandler:
     @staticmethod
     def get_comment_author(comment):
         author_elem = comment.find_element_by_class_name('_6qw4')
-        author = author_elem.get_attribute('href').split('https://www.facebook.com/')[1]
+        author = author_elem.get_attribute('href').split('/')[-1]
         return author
 
     @staticmethod

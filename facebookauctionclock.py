@@ -143,7 +143,7 @@ class FacebookAuctionClock:
             self.load_sync_page()
 
         print('.', end='')
-        post_attempted = self.fb.post_comment(self.nonsense() if self.dev_mode else '    Syncing...')
+        post_attempted = self.fb.post_comment('.')
 
         self.fb.check_for_antispam_measures()
 
@@ -156,10 +156,3 @@ class FacebookAuctionClock:
         self.fb.delete_last_comment()
 
         return posting_delay
-
-    @staticmethod
-    def nonsense():
-        word_count = random.randint(3, 10)
-        word_list = ('here', 'are', 'some', 'words', 'to', 'try', 'and', 'beat', 'the', 'spam', 'filter')
-        output = ' '.join([word_list[random.randint(0, len(word_list) - 1)] for word in range(0, word_count)])
-        return output

@@ -182,7 +182,7 @@ class Supervisor:
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
-        if bid_value < 200:
+        if bid_value < 208:
             raise RuntimeError(
                 f'Bid value of {bid_value}NTD seems too low - something has gone wrong when parsing bids. Aborting.')
 

@@ -16,20 +16,46 @@ class ConstraintSet:
             config.read('live_config.ini')
             tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
 
-        if config['Constraints']['Expiry'] == 'generateShort':
+        constraints_dict = config['Constraints']
+
+        if constraints_dict['Expiry'] == 'generateShort':
             self.expiry = self.get_short_expiry()
-        elif config['Constraints']['Expiry'] == 'generateMedium':
+        elif constraints_dict['Expiry'] == 'generateMedium':
             self.expiry = self.get_medium_expiry()
-        elif config['Constraints']['Expiry'] == 'generateLong':
+        elif constraints_dict['Expiry'] == 'generateLong':
             self.expiry = self.get_long_expiry()
         else:
-            self.expiry = self.parse_auction_datetime(config['Constraints']['Expiry'], tz)
-        self.extensions = int(config['Constraints']['Extensions'])
-        self.make_initial_bid = True if config['Constraints']['MakeInitialBid'] == 'True' else False
-        self.minimum_bids = int(config['Constraints']['MinimumBids'])
-        self.starting_bid = int(config['Constraints']['StartingBid'])
-        self.min_bid_step = int(config['Constraints']['BidStep'])
-        self.max_bid = int(config['Constraints']['MaxBid'])
+            self.expiry = self.parse_auction_datetime(constraints_dict['Expiry'], tz)
+
+        try:
+            self.extensions = int(constraints_dict['Extensions'])
+        except KeyError:
+            self.extensions = 0
+        try:
+            self.make_initial_bid = True if constraints_dict['MakeInitialBid'] == 'True' else False
+        except KeyError:
+            self.make_initial_bid = True
+
+        try:
+            self.minimum_bids = int(constraints_dict['MinimumBids'])
+        except:
+            self.minimum_bids = 0
+
+        try:
+            self.starting_bid = int(constraints_dict['StartingBid'])
+        except:
+            self.starting_bid = 1
+
+        try:
+            self.min_bid_step = int(constraints_dict['BidStep'])
+        except:
+            self.min_bid_step = 100
+
+        try:
+            self.max_bid = int(constraints_dict['MaxBid'])
+        except KeyError:
+            print(f'NO MAXIMUM BID GIVEN - DEFAULTING TO WATCHING ONLY')
+            self.max_bid = 0
 
     def parse_auction_datetime(self, dt_string, tz):
         # input must be in YYYY/MM/DD hh:mm or YYYY/MM/DD hh:mm:ss format

@@ -49,6 +49,11 @@ class Supervisor:
         else:
             self.prevent_shutdown = False
 
+        if 'use_gui' in kwargs:
+            use_gui = kwargs['use_gui']
+        else:
+            use_gui = False
+
         self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
         self.constraints = ConstraintSet(self.dev_mode)
 
@@ -56,7 +61,7 @@ class Supervisor:
 
         self.extensions_remaining = self.constraints.extensions
 
-        self.webdriver = get_webdriver(self.user.id, self.dev_mode)
+        self.webdriver = get_webdriver(self.user.id, use_gui)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
         self.fbgroup = FbGroup(config['Auction']['GroupNickname'])

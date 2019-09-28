@@ -21,6 +21,11 @@ from user import User
 from webdriver import get_webdriver
 
 
+class MissingBidHistoryException(RuntimeError):
+    def __init__(self):
+        super().__init__('Bid history appears to be empty')
+
+
 class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
@@ -132,6 +137,9 @@ class Supervisor:
             self.refresh_bid_history()
             self.countdown.proc()
 
+            if not self.valid_bid_history:
+                raise MissingBidHistoryException()
+
             if self.winning():
                 pass
 
@@ -155,6 +163,9 @@ class Supervisor:
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
+        except MissingBidHistoryException as err:
+            print(err.__repr__())
+            print(f'History: {self.valid_bid_history}')
 
     def sync_clock_if_required(self):
         if self.fbclock.sync_required():

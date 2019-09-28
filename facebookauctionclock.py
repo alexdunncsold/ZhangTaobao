@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from facebookhandler import FacebookHandler
 from facebookgroup import FbGroup
 from pytz import utc
+from selenium.common.exceptions import JavascriptException
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from time import sleep
@@ -153,6 +154,11 @@ class FacebookAuctionClock:
 
         # Perform cleanup
         sleep(1)  # todo use implicit_wait
-        self.fb.delete_last_comment()
+
+        try:
+            self.fb.delete_last_comment()
+        except JavascriptException:
+            print('Failed to delete sync comment.')
+
 
         return posting_delay

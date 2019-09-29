@@ -22,6 +22,11 @@ from user import User
 from webdriver import get_webdriver
 
 
+class MissingBidHistoryException(RuntimeError):
+    def __init__(self):
+        super().__init__('Bid history appears to be empty')
+
+
 class Supervisor:
     auctionpost = None
     constraints = None
@@ -56,8 +61,17 @@ class Supervisor:
         else:
             self.prevent_shutdown = False
 
+        if 'use_gui' in kwargs:
+            use_gui = kwargs['use_gui']
+        else:
+            use_gui = False
+
+        # self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
+        # self.constraints = ConstraintSet(self.dev_mode)
+
         self.user = User(user_nickname)
-        self.webdriver = get_webdriver(self.user.id, self.dev_mode)
+
+        self.webdriver = get_webdriver(self.user.id, use_gui)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
 
@@ -148,6 +162,9 @@ class Supervisor:
             self.refresh_bid_history()
             self.countdown.proc()
 
+            if not self.valid_bid_history:
+                raise MissingBidHistoryException()
+
             if self.winning():
                 pass
 
@@ -171,6 +188,9 @@ class Supervisor:
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
+        except MissingBidHistoryException as err:
+            print(err.__repr__())
+            print(f'History: {self.valid_bid_history}')
 
     def sync_clock_if_required(self):
         if self.fbclock.sync_required():
@@ -203,7 +223,7 @@ class Supervisor:
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
-        if bid_value < 200:
+        if bid_value < 208:
             raise RuntimeError(
                 f'Bid value of {bid_value}NTD seems too low - something has gone wrong when parsing bids. Aborting.')
 

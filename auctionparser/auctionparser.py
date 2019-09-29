@@ -150,13 +150,13 @@ def parse_bid_step(text):
     return int(bid_step)
 
 
-def parse_minimum_bid(text):
+def parse_starting_bid(text):
     try:
-        minimum_bid = re.search('(?<=起標)\d*(?=元)', text)[0].replace('+', '')
+        starting_bid = re.search('(?<=起標)\d*(?=元)', text)[0].replace('+', '')
     except:
         return None
 
-    return int(minimum_bid)
+    return int(starting_bid)
 
 
 print(f'prodder:{parse_producer(test_post_text)}\n'
@@ -166,5 +166,5 @@ print(f'prodder:{parse_producer(test_post_text)}\n'
       f'type:{parse_tea_type(test_post_text)}\n'
       f'storage:{parse_storage_type(test_post_text)}\n'
       f'expiry: {parse_expiry(test_post_text)}\n'
-      f'min bid: {parse_minimum_bid(test_post_text)}\n'
+      f'min bid: {parse_starting_bid(test_post_text)}\n'
       f'bid step: {parse_bid_step(test_post_text)}')

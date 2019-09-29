@@ -29,15 +29,6 @@ class ConstraintSet:
             self.extensions = int(constraints_dict['Extensions'])
         except KeyError:
             self.extensions = 0
-        try:
-            self.make_initial_bid = True if constraints_dict['MakeInitialBid'] == 'True' else False
-        except KeyError:
-            self.make_initial_bid = True
-
-        try:
-            self.minimum_bids = int(constraints_dict['MinimumBids'])
-        except:
-            self.minimum_bids = 0
 
         try:
             self.starting_bid = int(constraints_dict['StartingBid'])

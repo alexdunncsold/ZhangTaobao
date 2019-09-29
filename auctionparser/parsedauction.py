@@ -13,4 +13,4 @@ class ParsedAuction:
         self.storage_type = parse.parse_storage_type(full_post_text)
         self.expiry = parse.parse_expiry(full_post_text)
         self.bid_step = parse.parse_bid_step(full_post_text)
-        self.minimum_bid = parse.parse_minimum_bid(full_post_text)
+        self.starting_bid = parse.parse_starting_bid(full_post_text)

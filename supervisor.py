@@ -37,7 +37,6 @@ class Supervisor:
     valid_bid_history = None
     my_valid_bid_count = 0
 
-    initial_bid_made = False
     initial_snipe_performed = False
     most_recent_bid_submission = None
 
@@ -116,7 +115,6 @@ class Supervisor:
         self.valid_bid_history = None
         self.my_valid_bid_count = 0
 
-        self.initial_bid_made = False
         self.initial_snipe_performed = False
         self.most_recent_bid_submission = None
 
@@ -182,10 +180,6 @@ class Supervisor:
 
                 self.initial_snipe_performed = True
 
-            elif self.initial_bid_due():
-                print('time to make initial bid')
-                self.make_bid()
-
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
         except MissingBidHistoryException as err:
@@ -235,7 +229,6 @@ class Supervisor:
             print(f'Submitting "{comment_content}"')
             self.fb.post_comment(comment_content)
 
-            self.initial_bid_made = True
             self.most_recent_bid_submission = bid_value
             self.trigger_extension()
             sleep(0.05)
@@ -249,9 +242,6 @@ class Supervisor:
             self.countdown.reset()
             self.extensions_remaining -= 1
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
-
-    def initial_bid_due(self):
-        return self.constraints.make_initial_bid and not self.initial_bid_made
 
     def perform_final_state_output(self):
         sleep(1)
@@ -291,7 +281,6 @@ class Supervisor:
                 my_valid_bid_count += 1
 
         self.my_valid_bid_count = my_valid_bid_count
-        self.initial_bid_made = (my_valid_bid_count > 0)
         self.valid_bid_history = valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
@@ -368,9 +357,6 @@ class Supervisor:
 
         return valid_bid_history
 
-    def more_bids_required(self):
-        return self.my_valid_bid_count < self.constraints.minimum_bids
-
     def critical_period_active(self):
         return self.fbclock.get_time_remaining() < timedelta(seconds=5)
 
@@ -386,9 +372,6 @@ class Supervisor:
             self.print_bid(bid)
         if self.fbclock.auction_last_call():
             self.print_auction_result()
-        else:
-            print(f'{self.user.id} has made {self.my_valid_bid_count} valid bids so far '
-                  f'({self.constraints.minimum_bids} required)')
 
     def print_auction_result(self):
         try:

@@ -4,19 +4,17 @@ from pytz import utc, timezone
 
 
 class ConstraintSet:
-    def __init__(self, dev_mode=False):
+    def __init__(self, auction_config_section):
         config = configparser.ConfigParser()
         group_config = configparser.ConfigParser()
         group_config.read('group_config.ini')
 
-        if dev_mode:
-            config.read('test_config.ini')
+        if auction_config_section['GroupNickname'] == 'dev':
             tz = timezone(group_config['dev']['Timezone'])
         else:
-            config.read('live_config.ini')
             tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
 
-        constraints_dict = config['Constraints']
+        constraints_dict = auction_config_section  # todo replace refs to conDict woth acs
 
         if constraints_dict['Expiry'] == 'generateShort':
             self.expiry = self.get_short_expiry()
@@ -31,15 +29,6 @@ class ConstraintSet:
             self.extensions = int(constraints_dict['Extensions'])
         except KeyError:
             self.extensions = 0
-        try:
-            self.make_initial_bid = True if constraints_dict['MakeInitialBid'] == 'True' else False
-        except KeyError:
-            self.make_initial_bid = True
-
-        try:
-            self.minimum_bids = int(constraints_dict['MinimumBids'])
-        except:
-            self.minimum_bids = 0
 
         try:
             self.starting_bid = int(constraints_dict['StartingBid'])
@@ -83,14 +72,14 @@ class ConstraintSet:
         t += timedelta(minutes=1) if t.second < 15 else timedelta(minutes=2)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
-    # Returns an auction expiry in approx. 2min, ending at XX:XX:00.000000
+    # Returns an auction expiry in approx. 3min, ending at XX:XX:00.000000
     def get_medium_expiry(self):
         t = datetime.utcnow().replace(tzinfo=utc)
-        t += timedelta(minutes=2) if t.second < 15 else timedelta(minutes=3)
+        t += timedelta(minutes=3) if t.second < 15 else timedelta(minutes=4)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
-    # Returns an auction expiry in approx. 3min, ending at XX:XX:00.000000
+    # Returns an auction expiry in approx. 5min, ending at XX:XX:00.000000
     def get_long_expiry(self):
         t = datetime.utcnow().replace(tzinfo=utc)
-        t += timedelta(minutes=3) if t.second < 15 else timedelta(minutes=4)
+        t += timedelta(minutes=5) if t.second < 15 else timedelta(minutes=6)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)

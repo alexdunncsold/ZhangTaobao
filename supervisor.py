@@ -2,6 +2,7 @@ import configparser
 from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
+from auctionconfig import  get_unexpired_auctions
 import os
 
 from archiver import Archiver
@@ -27,10 +28,15 @@ class MissingBidHistoryException(RuntimeError):
 
 
 class Supervisor:
+    auctionpost = None
+    constraints = None
+    extensions_remaining = None
+    fbclock = None
+    countdown = None
+
     valid_bid_history = None
     my_valid_bid_count = 0
 
-    initial_bid_made = False
     initial_snipe_performed = False
     most_recent_bid_submission = None
 
@@ -59,30 +65,59 @@ class Supervisor:
         else:
             use_gui = False
 
-        self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
-        self.constraints = ConstraintSet(self.dev_mode)
+        # self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
+        # self.constraints = ConstraintSet(self.dev_mode)
 
         self.user = User(user_nickname)
-
-        self.extensions_remaining = self.constraints.extensions
 
         self.webdriver = get_webdriver(self.user.id, use_gui)
         self.archiver = Archiver(self.webdriver) if self.archive_mode else None
         self.fb = FacebookHandler(self.webdriver)
-        self.fbgroup = FbGroup(config['Auction']['GroupNickname'])
-        self.fbclock = FacebookAuctionClock(self.fb, self.constraints, self.dev_mode)
-        self.countdown = CountdownTimer(self.fbclock)
 
         try:
             self.init_selenium()
         except Exception as err:
-            print(f'Encountered exception in supervisor init:{err.__repr__()}')
+            print(f'Encountered exception in selenium init:{err.__repr__()}')
             self.webdriver.quit()
             raise err
+
+        self.pending_auctions = get_unexpired_auctions(dev=self.dev_mode)
 
     def init_selenium(self):
         self.fb.login_with(self.user)
         self.user.id = self.fb.get_facebook_id(dev=self.dev_mode)
+
+    def run(self):
+        print(
+            f'Covering the following auctions:\n{["    " + auction.auction_post.id + " " + str(auction.constraints.expiry) for auction in self.pending_auctions]}')
+        try:
+            for auction in self.pending_auctions:
+                print('#' * 100 + '\nStarting new auction\n' + '#' * 100)
+                self.prepare_for_auction(auction)
+                self.perform_main_loop()
+        finally:
+            if not self.prevent_shutdown:
+                print('Quitting webdriver...')
+                self.webdriver.quit()
+            else:
+                print("Webdriver quit intentionally prevented (running in shutdown=False mode)")
+
+    print('Finished gracefully')
+
+    def prepare_for_auction(self, auction_instance):
+        self.fbgroup = FbGroup(id=auction_instance.auction_post.group_id)  # todo make this less terrible
+        self.auctionpost = auction_instance.auction_post
+        self.constraints = auction_instance.constraints
+        self.extensions_remaining = auction_instance.constraints.extensions
+        self.fbclock = FacebookAuctionClock(self.fb, auction_instance.constraints, self.dev_mode)
+        self.countdown = CountdownTimer(self.fbclock)
+
+        self.valid_bid_history = None
+        self.my_valid_bid_count = 0
+
+        self.initial_snipe_performed = False
+        self.most_recent_bid_submission = None
+
         self.load_auction_page()
         self.auctionpost.name = self.fb.get_auction_name()
         self.print_preamble()
@@ -107,19 +142,7 @@ class Supervisor:
             self.save_error_dump_html()
             raise err
         finally:
-            try:
-                self.perform_final_state_output()
-
-                # Clean up final post if it's the test auction
-                if self.dev_mode:
-                    self.fb.delete_last_comment()
-            finally:
-                if not self.prevent_shutdown:
-                    print('Quitting webdriver...')
-                    self.webdriver.quit()
-                else:
-                    print("Webdriver quit intentionally prevented (running in shutdown=False mode)")
-            print('Finished gracefully')
+            self.perform_final_state_output()
 
     def save_error_dump_html(self):
         try:
@@ -156,10 +179,6 @@ class Supervisor:
                     self.make_bid()
 
                 self.initial_snipe_performed = True
-
-            elif self.initial_bid_due():
-                print('time to make initial bid')
-                self.make_bid()
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
@@ -210,7 +229,6 @@ class Supervisor:
             print(f'Submitting "{comment_content}"')
             self.fb.post_comment(comment_content)
 
-            self.initial_bid_made = True
             self.most_recent_bid_submission = bid_value
             self.trigger_extension()
             sleep(0.05)
@@ -224,9 +242,6 @@ class Supervisor:
             self.countdown.reset()
             self.extensions_remaining -= 1
             print(f'Bid placed in final 5min - auction time extended to {self.constraints.expiry}')
-
-    def initial_bid_due(self):
-        return self.constraints.make_initial_bid and not self.initial_bid_made
 
     def perform_final_state_output(self):
         sleep(1)
@@ -266,7 +281,6 @@ class Supervisor:
                 my_valid_bid_count += 1
 
         self.my_valid_bid_count = my_valid_bid_count
-        self.initial_bid_made = (my_valid_bid_count > 0)
         self.valid_bid_history = valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
@@ -343,9 +357,6 @@ class Supervisor:
 
         return valid_bid_history
 
-    def more_bids_required(self):
-        return self.my_valid_bid_count < self.constraints.minimum_bids
-
     def critical_period_active(self):
         return self.fbclock.get_time_remaining() < timedelta(seconds=5)
 
@@ -361,9 +372,6 @@ class Supervisor:
             self.print_bid(bid)
         if self.fbclock.auction_last_call():
             self.print_auction_result()
-        else:
-            print(f'{self.user.id} has made {self.my_valid_bid_count} valid bids so far '
-                  f'({self.constraints.minimum_bids} required)')
 
     def print_auction_result(self):
         try:

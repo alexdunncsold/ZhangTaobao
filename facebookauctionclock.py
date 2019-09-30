@@ -29,8 +29,7 @@ class FacebookAuctionClock:
 
         self.sync_threshold = timedelta(minutes=int(config['settings']['SyncThresholdMinutes']))
         self.abort_threshold = timedelta(seconds=int(config['settings']['SyncAbortThresholdSeconds']))
-        self.maximal_delay_safety_buffer = timedelta(
-            milliseconds=int(config['settings']['DelaySafetyBufferMilliseconds']))
+        self.maximal_delay_safety_buffer_ms = int(config['settings']['DelaySafetyBufferMilliseconds'])
         self.default_posting_delay = timedelta(seconds=int(config['settings']['SafeDefaultPostingDelaySeconds']))
 
     def sync_if_required(self):
@@ -67,10 +66,12 @@ class FacebookAuctionClock:
 
         try:
             self.load_sync_page()
-            mean_posting_delay = self.get_mean_posting_delay(trials)
-            self.maximal_delay = mean_posting_delay \
-                                 + self.maximal_delay_safety_buffer
-            print(f'\n    Mean posting delay = {self.timedelta_to_ms(mean_posting_delay)}ms')
+            posting_delays = self.get_posting_delay_dataset(trials)
+            print(f'\nDelays: {", ".join([str(delay) + "ms" for delay in sorted(posting_delays)])}')
+
+            self.maximal_delay = \
+                max(timedelta(milliseconds=(statistics.mean(posting_delays) + self.maximal_delay_safety_buffer_ms)),
+                    timedelta(milliseconds=(max(posting_delays) + 50)))
 
         except RuntimeError:
             self.maximal_delay = timedelta(seconds=5)
@@ -100,7 +101,7 @@ class FacebookAuctionClock:
         else:
             return math.ceil(td.seconds * 1000 + td.microseconds / 1000)
 
-    def get_mean_posting_delay(self, trials):
+    def get_posting_delay_dataset(self, trials):
         delay_results_ms = []
         try:
             for trial in range(0, trials):
@@ -118,13 +119,7 @@ class FacebookAuctionClock:
         except RuntimeError as err:
             print(f'\n    {err.__repr__()}')
 
-        print(f'\ndelay-data ({statistics.mean(delay_results_ms)}ms): {sorted(delay_results_ms)}')
-        print(
-            f'culled to  ({statistics.mean(self.strip_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
-        print(
-            f'lows-culled ({statistics.mean(self.strip_low_outliers(delay_results_ms))}ms): {sorted(self.strip_outliers(delay_results_ms))}')
-        return timedelta(milliseconds=statistics.mean(self.strip_outliers(delay_results_ms))) if delay_results_ms \
-            else self.default_posting_delay
+        return delay_results_ms
 
     @staticmethod
     def strip_outliers(data, factor=3):

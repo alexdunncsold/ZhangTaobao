@@ -155,5 +155,4 @@ class FacebookAuctionClock:
         except JavascriptException:
             print('Failed to delete sync comment.')
 
-
         return posting_delay

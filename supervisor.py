@@ -38,6 +38,7 @@ class Supervisor:
     my_valid_bid_count = 0
 
     initial_snipe_performed = False
+    snipers_spotted = False
     most_recent_bid_submission = None
 
     def __init__(self, user_nickname='alex', **kwargs):
@@ -116,6 +117,7 @@ class Supervisor:
         self.my_valid_bid_count = 0
 
         self.initial_snipe_performed = False
+        self.snipers_spotted = False
         self.most_recent_bid_submission = None
 
         self.load_auction_page()
@@ -160,25 +162,36 @@ class Supervisor:
             self.refresh_bid_history()
             self.countdown.proc()
 
+            if self.snipers_present() and not self.snipers_spotted:
+                print('Auction is contested - someone is typing!')
+                self.snipers_spotted = True
+
             if not self.valid_bid_history:
                 raise MissingBidHistoryException()
 
-            if self.winning():
+            if self.winning() and not self.snipers_spotted:
                 pass
 
             elif not self.can_bid():
                 pass
 
-            elif self.time_to_snipe():
-                print('time to snipe')
-                if not self.initial_snipe_performed \
-                        and self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+            elif self.initial_snipe_ready():
+                print('time for initial snipe')
+                if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
                     # Add a lucky 8 to the initial snipe
                     self.make_bid(1, 8)
                 else:
                     self.make_bid()
 
                 self.initial_snipe_performed = True
+
+            elif self.final_snipe_ready():
+                print('time for final snipe')
+
+                if self.snipers_spotted and not self.extensions_remaining:
+                    self.make_bid(0, self.get_countersnipe_increase())
+                else:
+                    self.make_bid()
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
@@ -209,11 +222,18 @@ class Supervisor:
         except IndexError:
             return self.constraints.starting_bid
 
-    def time_to_snipe(self):
+    def snipers_present(self):
+        begin_checking_at_datetime = self.constraints.expiry - timedelta(seconds=5.5)
+        return self.fbclock.get_current_time() > begin_checking_at_datetime and self.fb.someone_is_typing()
+
+    def initial_snipe_ready(self):
         initial_snipe_threshold = timedelta(seconds=4)
-        return (self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold
-                and not self.initial_snipe_performed) \
-               or self.fbclock.auction_last_call()
+        return self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold\
+            and (not self.initial_snipe_performed) \
+            and (not self.snipers_spotted)
+
+    def final_snipe_ready(self):
+        return self.fbclock.auction_last_call()
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
@@ -234,6 +254,10 @@ class Supervisor:
             sleep(0.05)
         else:
             print('Duplicate bid submission avoided')
+
+    def get_countersnipe_increase(self):
+        affordable_bid = self.min(self.get_lowest_valid_bid_value(3) + 8, self.constraints.max_bid)
+        return affordable_bid - self.valid_bid_history[-1]
 
     def trigger_extension(self):
         if self.extensions_remaining > 0 \

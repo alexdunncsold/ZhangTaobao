@@ -251,7 +251,7 @@ class Supervisor:
             print('Duplicate bid submission avoided')
 
     def get_countersnipe_increase(self):
-        affordable_bid = min(self.get_lowest_valid_bid_value(3) + 8, self.constraints.max_bid)
+        affordable_bid = min(self.get_lowest_valid_bid_value(4) + 8, self.constraints.max_bid)
         return affordable_bid - self.valid_bid_history[-1].value
 
     def trigger_extension(self):

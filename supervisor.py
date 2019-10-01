@@ -170,15 +170,15 @@ class Supervisor:
             elif not self.can_bid():
                 pass
 
-            elif self.initial_snipe_ready():
-                print('time for initial snipe')
-                if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
-                    # Add a lucky 8 to the initial snipe
-                    self.make_bid(1, 8)
-                else:
-                    self.make_bid()
-
-                self.initial_snipe_performed = True
+            # elif self.initial_snipe_ready():
+            #     print('time for initial snipe')
+            #     if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+            #         # Add a lucky 8 to the initial snipe
+            #         self.make_bid(1, 8)
+            #     else:
+            #         self.make_bid()
+            #
+            #     self.initial_snipe_performed = True
 
             elif self.final_snipe_ready():
                 print('time for final snipe')
@@ -218,7 +218,7 @@ class Supervisor:
             return self.constraints.starting_bid
 
     def snipers_present(self):
-        begin_checking_at_datetime = self.constraints.expiry - timedelta(seconds=30)  # 5.5)
+        begin_checking_at_datetime = self.constraints.expiry - timedelta(seconds=90)
         return self.fbclock.get_current_time() > begin_checking_at_datetime and self.fb.someone_is_typing()
 
     def initial_snipe_ready(self):
@@ -356,8 +356,7 @@ class Supervisor:
     # Reset countersnipe detection if non-paranoid and there are no other countersnipers
     def relax_if_warranted(self):
         if self.snipers_spotted and not self.constraints.paranoid_mode and not self.fb.someone_is_typing():
-            print(
-                'Countersniper has bid - relaxing posture')
+            print('Countersniper has bid - relaxing posture')
             self.snipers_spotted = False
 
     def get_bid_history_accurately(self, comment_elem_list):

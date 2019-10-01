@@ -114,7 +114,7 @@ class FacebookAuctionClock:
                             f'Less than {self.abort_threshold.seconds} seconds left in auction, aborting test after ' +
                             f'{len(delay_results_ms)} tests')
                 except NoSuchElementException:
-                    print('Err', end='')
+                    print('X', end='')
         except RuntimeError as err:
             print(f'\n    {err.__repr__()}')
 
@@ -158,6 +158,6 @@ class FacebookAuctionClock:
         try:
             self.fb.delete_last_comment()
         except JavascriptException:
-            print('Failed to delete sync comment.')
-
+            # print('Failed to delete sync comment.')
+            pass
         return posting_delay

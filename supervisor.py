@@ -44,27 +44,27 @@ class Supervisor:
     def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
 
-        if 'dev' in kwargs and kwargs['dev']:  # todo clean up kwargs - there must be a better way
-            self.dev_mode = True
-            config.read('test_config.ini')
-        else:
+        try:
+            self.dev_mode = kwargs['dev_mode']
+        except KeyError:
             self.dev_mode = False
-            config.read('live_config.ini')
 
-        if 'archive' in kwargs:
+        try:
             self.archive_mode = kwargs['archive']
-        else:
+        except KeyError:
             self.archive_mode = True
 
-        if 'prevent_shutdown' in kwargs:
+        try:
             self.prevent_shutdown = kwargs['prevent_shutdown']
-        else:
+        except KeyError:
             self.prevent_shutdown = False
 
-        if 'use_gui' in kwargs:
+        try:
             use_gui = kwargs['use_gui']
-        else:
+        except KeyError:
             use_gui = False
+
+        config.read('test_config.ini' if self.dev_mode else 'live_config.ini')
 
         self.user = User(user_nickname)
 

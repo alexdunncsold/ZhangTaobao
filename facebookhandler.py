@@ -156,6 +156,14 @@ class FacebookHandler:
 
         self.webdriver.get(url)
 
+    def someone_is_typing(self):
+        try:
+            el = self.webdriver.find_element_by_class_name("__f9")
+            return True
+        except NoSuchElementException:
+            return False
+
+
     @staticmethod
     def get_comment_author(comment):
         author_elem = comment.find_element_by_class_name('_6qw4')

@@ -2,7 +2,7 @@ import configparser
 from time import sleep
 from pytz import utc
 from datetime import datetime, timedelta
-from auctionconfig import  get_unexpired_auctions
+from auctionconfig import get_unexpired_auctions
 import os
 
 from archiver import Archiver
@@ -35,38 +35,35 @@ class Supervisor:
     countdown = None
 
     valid_bid_history = None
-    my_valid_bid_count = 0
 
     initial_snipe_performed = False
+    snipers_spotted = False
     most_recent_bid_submission = None
 
     def __init__(self, user_nickname='alex', **kwargs):
         config = configparser.ConfigParser()
 
-        if 'dev' in kwargs and kwargs['dev']:  # todo clean up kwargs - there must be a better way
-            self.dev_mode = True
-            config.read('test_config.ini')
-        else:
+        try:
+            self.dev_mode = kwargs['dev']
+        except KeyError:
             self.dev_mode = False
-            config.read('live_config.ini')
 
-        if 'archive' in kwargs:
+        try:
             self.archive_mode = kwargs['archive']
-        else:
+        except KeyError:
             self.archive_mode = True
 
-        if 'prevent_shutdown' in kwargs:
+        try:
             self.prevent_shutdown = kwargs['prevent_shutdown']
-        else:
+        except KeyError:
             self.prevent_shutdown = False
 
-        if 'use_gui' in kwargs:
+        try:
             use_gui = kwargs['use_gui']
-        else:
+        except KeyError:
             use_gui = False
 
-        # self.auctionpost = AuctionPost(config['Auction']['AuctionId'])
-        # self.constraints = ConstraintSet(self.dev_mode)
+        config.read('test_config.ini' if self.dev_mode else 'live_config.ini')
 
         self.user = User(user_nickname)
 
@@ -113,9 +110,9 @@ class Supervisor:
         self.countdown = CountdownTimer(self.fbclock)
 
         self.valid_bid_history = None
-        self.my_valid_bid_count = 0
 
         self.initial_snipe_performed = False
+        self.snipers_spotted = False
         self.most_recent_bid_submission = None
 
         self.load_auction_page()
@@ -160,25 +157,36 @@ class Supervisor:
             self.refresh_bid_history()
             self.countdown.proc()
 
+            if self.snipers_present() and not self.snipers_spotted:
+                print('Auction is contested - someone is typing!')
+                self.snipers_spotted = True
+
             if not self.valid_bid_history:
                 raise MissingBidHistoryException()
 
-            if self.winning():
+            if self.winning() and not self.snipers_spotted:
                 pass
 
             elif not self.can_bid():
                 pass
 
-            elif self.time_to_snipe():
-                print('time to snipe')
-                if not self.initial_snipe_performed \
-                        and self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
-                    # Add a lucky 8 to the initial snipe
-                    self.make_bid(1, 8)
+            # elif self.initial_snipe_ready():
+            #     print('time for initial snipe')
+            #     if self.constraints.max_bid >= self.get_lowest_valid_bid_value() + 8:
+            #         # Add a lucky 8 to the initial snipe
+            #         self.make_bid(1, 8)
+            #     else:
+            #         self.make_bid()
+            #
+            #     self.initial_snipe_performed = True
+
+            elif self.final_snipe_ready():
+                print('time for final snipe')
+
+                if self.snipers_spotted and not self.extensions_remaining:
+                    self.make_bid(0, self.get_countersnipe_increase())
                 else:
                     self.make_bid()
-
-                self.initial_snipe_performed = True
 
         except StaleElementReferenceException as err:
             print(f'Stale:{err.__repr__()}')
@@ -209,11 +217,18 @@ class Supervisor:
         except IndexError:
             return self.constraints.starting_bid
 
-    def time_to_snipe(self):
+    def snipers_present(self):
+        begin_checking_at_datetime = self.constraints.expiry - timedelta(seconds=90)
+        return self.fbclock.get_current_time() > begin_checking_at_datetime and self.fb.someone_is_typing()
+
+    def initial_snipe_ready(self):
         initial_snipe_threshold = timedelta(seconds=4)
-        return (self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold
-                and not self.initial_snipe_performed) \
-               or self.fbclock.auction_last_call()
+        return self.fbclock.get_current_time() > self.constraints.expiry - initial_snipe_threshold \
+               and (not self.initial_snipe_performed) \
+               and (not self.snipers_spotted)
+
+    def final_snipe_ready(self):
+        return self.fbclock.auction_last_call()
 
     def make_bid(self, steps=1, extra=0):
         bid_value = self.get_lowest_valid_bid_value(steps) + extra
@@ -234,6 +249,10 @@ class Supervisor:
             sleep(0.05)
         else:
             print('Duplicate bid submission avoided')
+
+    def get_countersnipe_increase(self):
+        affordable_bid = min(self.get_lowest_valid_bid_value(3) + 8, self.constraints.max_bid)
+        return affordable_bid - self.valid_bid_history[-1].value
 
     def trigger_extension(self):
         if self.extensions_remaining > 0 \
@@ -270,21 +289,17 @@ class Supervisor:
 
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
-            valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
+            new_valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
         # Else if operating in non-critical mode
         else:
-            valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
+            new_valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
 
-        my_valid_bid_count = 0
-        for bid in valid_bid_history:
-            if bid.bidder == self.user.id:
-                my_valid_bid_count += 1
-
-        self.my_valid_bid_count = my_valid_bid_count
-        self.valid_bid_history = valid_bid_history
+        if new_valid_bid_history:
+            # Only update the bid history if it is not empty
+            self.valid_bid_history = new_valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
-        valid_bid_history = []
+        new_valid_bid_history = []
 
         # for idx, comment in enumerate(comment_elem_list, start=len(self.valid_bid_history)):
         for idx, comment in enumerate(comment_elem_list):
@@ -298,23 +313,23 @@ class Supervisor:
                     print(f"User's bid of {candidate_bid.value} may be contested - disregarding bid")
                     raise ValueError
 
-                if not valid_bid_history \
-                        or candidate_bid.value >= valid_bid_history[-1].value + self.constraints.min_bid_step:
-
-                    # If this isn't running during initialisation
-                    if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
+                if self.bid_is_valid(candidate_bid, new_valid_bid_history):
+                    # If this isn't running during initialisation and bid is new
+                    if self.valid_bid_history and self.bid_is_new(candidate_bid):
                         print(f'New bid detected! (fast-mode)')
                         self.print_bid(candidate_bid)
+                        self.relax_if_warranted()
 
-                    valid_bid_history.append(candidate_bid)
+                    new_valid_bid_history.append(candidate_bid)
+
             except ValueError:
                 pass
             except NoSuchElementException:
                 pass
             except Exception:
-                pass
+                pass  # todo figure out what can trigger this and explicitly handle it
 
-        return valid_bid_history
+        return new_valid_bid_history
 
     # Detects user's bids that appear to precede competing bids in client but may not on server
     def potentially_contested(self, comment_idx, comment_elem_list):
@@ -325,12 +340,27 @@ class Supervisor:
                     and (comment_elem.timestamp == next_comment_elem.timestamp \
                          or comment_elem.timestamp == next_comment_elem.timestamp + timedelta(seconds=1)) \
                     and not bidparse.comment_parse(comment_elem).value > bidparse.comment_parse(
-                next_comment_elem).value:
+                next_comment_elem).value + self.constraints.min_bid_step:
                 return True
         return False
 
+    # Returns whether bid is valid with respect to last enumerated valid bid
+    def bid_is_valid(self, candidate_bid, bid_history):
+        return (not bid_history
+                or candidate_bid.value >= bid_history[-1].value + self.constraints.min_bid_step)
+
+    # Returns whether bid has been detected in any prior iteration
+    def bid_is_new(self, candidate_bid):
+        return not self.valid_bid_history or candidate_bid > self.valid_bid_history[-1]
+
+    # Reset countersnipe detection if non-paranoid and there are no other countersnipers
+    def relax_if_warranted(self):
+        if self.snipers_spotted and not self.constraints.paranoid_mode and not self.fb.someone_is_typing():
+            print('Countersniper has bid - relaxing posture')
+            self.snipers_spotted = False
+
     def get_bid_history_accurately(self, comment_elem_list):
-        valid_bid_history = []
+        new_valid_bid_history = []
 
         for comment in comment_elem_list:
             try:
@@ -339,15 +369,15 @@ class Supervisor:
                 if candidate_bid.timestamp >= self.constraints.expiry:
                     raise ValueError()
 
-                if not valid_bid_history \
-                        or candidate_bid.value >= valid_bid_history[-1].value + self.constraints.min_bid_step:
-
-                    # If this isn't running during initialisation
-                    if self.valid_bid_history and candidate_bid > self.valid_bid_history[-1]:
+                if self.bid_is_valid(candidate_bid, new_valid_bid_history):
+                    # If this isn't running during initialisation and bid is new
+                    if self.valid_bid_history and self.bid_is_new(candidate_bid):
                         print(f'New bid detected!')
                         self.print_bid(candidate_bid)
+                        self.relax_if_warranted()
 
-                    valid_bid_history.append(candidate_bid)
+                    new_valid_bid_history.append(candidate_bid)
+
             except ValueError:
                 pass
             except NoSuchElementException:
@@ -355,7 +385,7 @@ class Supervisor:
             except Exception as err:
                 pass
 
-        return valid_bid_history
+        return new_valid_bid_history
 
     def critical_period_active(self):
         return self.fbclock.get_time_remaining() < timedelta(seconds=5)

@@ -349,7 +349,7 @@ class Supervisor:
                     and (comment_elem.timestamp == next_comment_elem.timestamp \
                          or comment_elem.timestamp == next_comment_elem.timestamp + timedelta(seconds=1)) \
                     and not bidparse.comment_parse(comment_elem).value > bidparse.comment_parse(
-                next_comment_elem).value:
+                        next_comment_elem).value + self.constraints.min_bid_step:
                 return True
         return False
 

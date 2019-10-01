@@ -5,7 +5,6 @@ from pytz import utc, timezone
 
 class ConstraintSet:
     def __init__(self, auction_config_section):
-        config = configparser.ConfigParser()
         group_config = configparser.ConfigParser()
         group_config.read('group_config.ini')
 
@@ -14,39 +13,43 @@ class ConstraintSet:
         else:
             tz = timezone(group_config['DEFAULT']['Timezone'])  # timezone needs to be pulled from group
 
-        constraints_dict = auction_config_section  # todo replace refs to conDict woth acs
-
-        if constraints_dict['Expiry'] == 'generateShort':
+        if auction_config_section['Expiry'] == 'generateShort':
             self.expiry = self.get_short_expiry()
-        elif constraints_dict['Expiry'] == 'generateMedium':
+        elif auction_config_section['Expiry'] == 'generateMedium':
             self.expiry = self.get_medium_expiry()
-        elif constraints_dict['Expiry'] == 'generateLong':
+        elif auction_config_section['Expiry'] == 'generateLong':
             self.expiry = self.get_long_expiry()
         else:
-            self.expiry = self.parse_auction_datetime(constraints_dict['Expiry'], tz)
+            self.expiry = self.parse_auction_datetime(auction_config_section['Expiry'], tz)
 
         try:
-            self.extensions = int(constraints_dict['Extensions'])
+            self.extensions = int(auction_config_section['Extensions'])
         except KeyError:
             self.extensions = 0
 
         try:
-            self.starting_bid = int(constraints_dict['StartingBid'])
-        except:
+            self.starting_bid = int(auction_config_section['StartingBid'])
+        except KeyError:
             self.starting_bid = 1
 
         try:
-            self.min_bid_step = int(constraints_dict['BidStep'])
-        except:
+            self.min_bid_step = int(auction_config_section['BidStep'])
+        except KeyError:
             self.min_bid_step = 100
 
         try:
-            self.max_bid = int(constraints_dict['MaxBid'])
+            self.max_bid = int(auction_config_section['MaxBid'])
         except KeyError:
             print(f'NO MAXIMUM BID GIVEN - DEFAULTING TO WATCHING ONLY')
             self.max_bid = 0
 
-    def parse_auction_datetime(self, dt_string, tz):
+        try:
+            self.paranoid_mode = auction_config_section['Paranoid']
+        except KeyError:
+            self.paranoid_mode = False
+
+    @staticmethod
+    def parse_auction_datetime(dt_string, tz):
         # input must be in YYYY/MM/DD hh:mm or YYYY/MM/DD hh:mm:ss format
         date_parts = dt_string.split(' ')[0].split('/')
         time_parts = dt_string.split(' ')[1].split(':')
@@ -67,19 +70,22 @@ class ConstraintSet:
         return expiry_dt
 
     # Returns an auction expiry ending at XX:XX:00.000000
-    def get_short_expiry(self):
+    @staticmethod
+    def get_short_expiry():
         t = datetime.utcnow().replace(tzinfo=utc)
         t += timedelta(minutes=1) if t.second < 15 else timedelta(minutes=2)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
     # Returns an auction expiry in approx. 3min, ending at XX:XX:00.000000
-    def get_medium_expiry(self):
+    @staticmethod
+    def get_medium_expiry():
         t = datetime.utcnow().replace(tzinfo=utc)
         t += timedelta(minutes=3) if t.second < 15 else timedelta(minutes=4)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)
 
     # Returns an auction expiry in approx. 5min, ending at XX:XX:00.000000
-    def get_long_expiry(self):
+    @staticmethod
+    def get_long_expiry():
         t = datetime.utcnow().replace(tzinfo=utc)
         t += timedelta(minutes=5) if t.second < 15 else timedelta(minutes=6)
         return datetime(t.year, t.month, t.day, t.hour, t.minute, 0, 0, tzinfo=utc)

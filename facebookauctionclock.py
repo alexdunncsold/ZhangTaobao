@@ -107,13 +107,9 @@ class FacebookAuctionClock:
             for trial in range(0, trials):
                 try:
                     posting_delay = self.get_posting_delay_datum()
-                    if posting_delay < timedelta(0):  # todo seems to be useless.  Consider removal
-                        delay_ms = self.timedelta_to_ms(posting_delay)
-                    else:
-                        delay_ms = self.timedelta_to_ms(posting_delay)
-                    delay_results_ms.append(delay_ms)
+                    delay_results_ms.append(self.timedelta_to_ms(posting_delay))
 
-                    if self.get_time_remaining() < self.abort_threshold:  # todo find out why this never seems to trigger
+                    if self.get_time_remaining() < self.abort_threshold:
                         raise RuntimeError(
                             f'Less than {self.abort_threshold.seconds} seconds left in auction, aborting test after ' +
                             f'{len(delay_results_ms)} tests')

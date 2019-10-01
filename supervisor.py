@@ -35,7 +35,6 @@ class Supervisor:
     countdown = None
 
     valid_bid_history = None
-    my_valid_bid_count = 0
 
     initial_snipe_performed = False
     snipers_spotted = False
@@ -45,7 +44,7 @@ class Supervisor:
         config = configparser.ConfigParser()
 
         try:
-            self.dev_mode = kwargs['dev_mode']
+            self.dev_mode = kwargs['dev']
         except KeyError:
             self.dev_mode = False
 
@@ -111,7 +110,6 @@ class Supervisor:
         self.countdown = CountdownTimer(self.fbclock)
 
         self.valid_bid_history = None
-        self.my_valid_bid_count = 0
 
         self.initial_snipe_performed = False
         self.snipers_spotted = False
@@ -289,21 +287,16 @@ class Supervisor:
         self.fb.remove_all_child_comments()
         comment_elem_list = self.fb.get_comments()
 
-        # todo get new history, but only replace if new history is not empty
         # If response speed is more critical than maintaining an accurate record
         if self.critical_period_active() and not force_accurate:
-            valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
+            new_valid_bid_history = self.get_bid_history_quickly(comment_elem_list)
         # Else if operating in non-critical mode
         else:
-            valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
+            new_valid_bid_history = self.get_bid_history_accurately(comment_elem_list)
 
-        my_valid_bid_count = 0 # todo remove, because we don't care anymore
-        for bid in valid_bid_history:
-            if bid.bidder == self.user.id:
-                my_valid_bid_count += 1
-
-        self.my_valid_bid_count = my_valid_bid_count # todo remove, because we don't care anymore
-        self.valid_bid_history = valid_bid_history # todo get new history, but only replace if new history is not empty
+        if new_valid_bid_history:
+            # Only update the bid history if it is not empty
+            self.valid_bid_history = new_valid_bid_history
 
     def get_bid_history_quickly(self, comment_elem_list):
         new_valid_bid_history = []
@@ -364,7 +357,7 @@ class Supervisor:
     def relax_if_warranted(self):
         if self.snipers_spotted and not self.constraints.paranoid_mode and not self.fb.someone_is_typing():
             print(
-                'Countersniper has bid - relaxing posture')  # todo this is not activating - probably the typing element still exists when the bid is first seen
+                'Countersniper has bid - relaxing posture')
             self.snipers_spotted = False
 
     def get_bid_history_accurately(self, comment_elem_list):

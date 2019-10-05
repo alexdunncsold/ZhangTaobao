@@ -230,12 +230,20 @@ class Supervisor:
     def final_snipe_ready(self):
         return self.fbclock.auction_last_call()
 
-    def make_bid(self, steps=1, extra=0):
-        bid_value = self.get_lowest_valid_bid_value(steps) + extra
+    def make_bid(self, steps=1, extra=8):
+
+        # Add extra to the bid if possible, else just bid the minimum valid amount
+        if self.get_lowest_valid_bid_value(steps) + extra > self.constraints.max_bid:
+            bid_value = self.get_lowest_valid_bid_value(steps)
+        else:
+            bid_value = self.get_lowest_valid_bid_value(steps) + extra
+
+        # Check for bid values that indicate empty (ie erroneous) bid history
         if bid_value < 208:
             raise RuntimeError(
                 f'Bid value of {bid_value}NTD seems too low - something has gone wrong when parsing bids. Aborting.')
 
+        # Make sure you didn't already just submit a bid for this amount
         if bid_value != self.most_recent_bid_submission:
             print(f'Preparing to bid {bid_value}')
             if bid_value > self.constraints.max_bid:
